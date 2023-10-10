@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Reverse DNS From IPv4 Space</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
+    <style type="text/css">
+        html, body, #space {
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            margin: 0;
+        }
+
+        #space {
+            background: #111;
+            image-rendering: pixelated;
+        }
+
+        .leaflet-fade-anim .leaflet-popup {
+            transition: none;
+            font-family: monospace;
+        }
+
+        .leaflet-control-attribution {
+            font-size: 12pt;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="space"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+    <script>
+        let map = L.map('space', {
+            crs: L.CRS.Simple,
+            center: [-512, 512],
+            maxBounds: [[1, -1], [-1025, 1025]],
+            zoom: 0,
+        });
+
+        L.tileLayer('tiles/{z}-{x}-{y}.png', {
+            width: 65536,
+            height: 65536,
+            tileSize: 1024,
+            minZoom: -1,
+            maxZoom: 10,
+            minNativeZoom: 0,
+            maxNativeZoom: 6,
+            attribution: '&copy; Alexey Milovidov, ClickHouse, Inc.'
+        }).addTo(map);
+
+        map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/reversedns.space/">About</a>');
+
+        let popup = L.popup({maxWidth: 500});
+        let current_requested_ip = '';
+
+        let prev_query = '';
+        function updateHistory(x, y) {
+            const state = {
+                zoom: map.getZoom(),
+                center: map.getCenter(),
+            };
+
+            let query = `?zoom=${state.zoom}&lat=${state.center.lat}&lng=${state.center.lng}`;
+
+            if (x !== undefined && y !== undefined) {
+                state.x = x;
+                state.y = y;
+                query += `&x=${x}&y=${y}`;
+            }
+
+            console.log(query);
+
+            if (query != prev_query) {
+                history.pushState(state, '', query);
+                prev_query = query;
+            }
+        }
+
+        window.onpopstate = function(event) {
+            const state = event.state;
+            if (!state) {
+                return;
+            }
+
+            prev_query = window.location.search;
+            map.setView(state.center, state.zoom);
+
+            if (state.x !== undefined && state.y !== undefined) {
+                showPopup(state.x, state.y);
+            }
+        };
+
+        if (window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+
+            map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+
+            if (params.get('x') !== null && params.get('y') !== null) {
+                showPopup(BigInt(params.get('x')), BigInt(params.get('y')));
+            }
+        }
+
+        function showPopup(x, y) {
+            let ip_int = 0n;
+            for (let bit = 0n; bit < 16n; ++bit) {
+                ip_int |= ((x >> bit) & 1n) << (bit * 2n);
+                ip_int |= ((y >> bit) & 1n) << (1n + bit * 2n);
+            }
+
+            const ip_str = `${(ip_int >> 24n) & 0xFFn}.${(ip_int >> 16n) & 0xFFn}.${(ip_int >> 8n) & 0xFFn}.${(ip_int) & 0xFFn}`;
+            const reversed_ip_str = `${(ip_int) & 0xFFn}.${(ip_int >> 8n) & 0xFFn}.${(ip_int >> 16n) & 0xFFn}.${(ip_int >> 24n) & 0xFFn}`;
+
+            current_requested_ip = ip_str;
+
+            const response = fetch(
+                `https://cloudflare-dns.com/dns-query?name=${reversed_ip_str}.in-addr.arpa&type=PTR`,
+                {
+                    method: 'GET',
+                    headers: {'accept': 'application/dns-json'}
+                }).then(response => response.json().then(o => {
+
+                    let host = o.Answer ? o.Answer[0].data : 'no response';
+                    console.log(host);
+
+                    if (ip_str == current_requested_ip) {
+                        popup.setContent(`<b>${ip_str}</b><br/>${host}`);
+                    }
+                }));
+
+            popup
+                .setLatLng({ lat: (-Number(y) - 0.5) / 65536 * 1024, lng: (Number(x) + 0.5) / 65536 * 1024 })
+                .setContent(`${ip_str}`)
+                .openOn(map);
+        }
+
+        map.on('click', e => {
+            const x = BigInt(((e.latlng.lng / 1024) * 65536)|0);
+            const y = BigInt(((-e.latlng.lat / 1024) * 65536)|0);
+
+            if (x < 0n || x >= 65536n || y < 0n || y >= 65536n) return;
+
+            showPopup(x, y);
+            updateHistory(x, y);
+        });
+
+        map.on('moveend', e => updateHistory());
+    </script>
+</body>
+</html>
