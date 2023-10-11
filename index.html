@@ -57,7 +57,7 @@
         let current_requested_ip = '';
 
         let prev_query = '';
-        function updateHistory(x, y) {
+        function updateHistory() {
             const state = {
                 zoom: map.getZoom(),
                 center: map.getCenter(),
@@ -65,7 +65,8 @@
 
             let query = `?zoom=${state.zoom}&lat=${state.center.lat}&lng=${state.center.lng}`;
 
-            if (x !== undefined && y !== undefined) {
+            if (popup.isOpen()) {
+                const {x, y} = latLngToPixel(popup.getLatLng());
                 state.x = x;
                 state.y = y;
                 query += `&x=${x}&y=${y}`;
@@ -103,6 +104,14 @@
             }
         }
 
+        function latLngToPixel(latlng) {
+            return { x: BigInt(((latlng.lng / 1024) * 65536)|0), y: BigInt(((-latlng.lat / 1024) * 65536)|0) };
+        }
+
+        function pixelToLatLng(pixel) {
+            return { lat: (-Number(pixel.y) - 0.5) / 65536 * 1024, lng: (Number(pixel.x) + 0.5) / 65536 * 1024 };
+        }
+
         function showPopup(x, y) {
             let ip_int = 0n;
             for (let bit = 0n; bit < 16n; ++bit) {
@@ -131,19 +140,17 @@
                 }));
 
             popup
-                .setLatLng({ lat: (-Number(y) - 0.5) / 65536 * 1024, lng: (Number(x) + 0.5) / 65536 * 1024 })
+                .setLatLng(pixelToLatLng({x: x, y: y}))
                 .setContent(`${ip_str}`)
                 .openOn(map);
         }
 
         map.on('click', e => {
-            const x = BigInt(((e.latlng.lng / 1024) * 65536)|0);
-            const y = BigInt(((-e.latlng.lat / 1024) * 65536)|0);
-
+            const {x, y} = latLngToPixel(e.latlng);
             if (x < 0n || x >= 65536n || y < 0n || y >= 65536n) return;
 
             showPopup(x, y);
-            updateHistory(x, y);
+            updateHistory();
         });
 
         map.on('moveend', e => updateHistory());
