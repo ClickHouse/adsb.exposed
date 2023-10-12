@@ -114,18 +114,16 @@
             }
 
             const ip_str = `${(ip_int >> 24n) & 0xFFn}.${(ip_int >> 16n) & 0xFFn}.${(ip_int >> 8n) & 0xFFn}.${(ip_int) & 0xFFn}`;
-            const reversed_ip_str = `${(ip_int) & 0xFFn}.${(ip_int >> 8n) & 0xFFn}.${(ip_int >> 16n) & 0xFFn}.${(ip_int >> 24n) & 0xFFn}`;
-
             current_requested_ip = ip_str;
 
             const response = fetch(
-                `https://cloudflare-dns.com/dns-query?name=${reversed_ip_str}.in-addr.arpa&type=PTR`,
+                `https://driel7jwie.eu-west-1.aws.clickhouse-staging.com/?user=website`,
                 {
-                    method: 'GET',
-                    headers: {'accept': 'application/dns-json'}
+                    method: 'POST',
+                    body: `SELECT domain FROM dns_parsed WHERE ip = '${ip_str}' FORMAT JSON`
                 }).then(response => response.json().then(o => {
 
-                    let host = o.Answer ? o.Answer[0].data : 'no response';
+                    let host = o.rows ? o.data[0].domain : 'no response';
 
                     if (ip_str == current_requested_ip) {
                         popup.setContent(`<b>${ip_str}</b><br/>${host}`);

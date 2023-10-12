@@ -89,3 +89,29 @@ replaceRegexpOne(tupleElement(t.Answer[1], 'data'), '\.$', '') AS domain
 FROM dns
 WHERE notEmpty(t.Answer)
 SETTINGS allow_experimental_analyzer = 1;
+
+
+
+CREATE USER website IDENTIFIED WITH sha256_hash BY 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855' SETTINGS add_http_cors_header = 1 READONLY, limit = 1 READONLY, offset = 0 READONLY, max_result_rows = 1 READONLY, force_primary_key = 1 READONLY, allow_experimental_parallel_reading_from_replicas = 0 READONLY, readonly = 1;
+
+GRANT SELECT ON default.dns_parsed TO website;
+
+CREATE QUOTA website
+KEYED BY ip_address
+FOR RANDOMIZED INTERVAL 1 MINUTE MAX query_selects = 100,
+FOR RANDOMIZED INTERVAL 1 HOUR MAX query_selects = 3000,
+FOR RANDOMIZED INTERVAL 1 DAY MAX query_selects = 30000
+TO website;
+
+
+/*
+CREATE TABLE dns_search
+(
+    reversed_domain String,
+    ip IPv4
+)
+ENGINE = MergeTree
+ORDER BY (reversed_domain, ip);
+
+INSERT INTO dns_search SELECT reverse(replaceRegexpOne(domain, '(^|\.)([\d\-]+\.)+|\\ ', '')) AS d, ip FROM dns_parsed WHERE d != '';
+*/
