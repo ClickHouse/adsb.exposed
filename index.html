@@ -120,7 +120,7 @@
                 `https://driel7jwie.eu-west-1.aws.clickhouse-staging.com/?user=website`,
                 {
                     method: 'POST',
-                    body: `SELECT domain FROM dns_parsed WHERE ip = '${ip_str}' FORMAT JSON`
+                    body: `SELECT encodeXMLComponent(domain) AS domain FROM dns_parsed WHERE ip = '${ip_str}' FORMAT JSON`
                 }).then(response => response.json().then(o => {
 
                     let host = o.rows ? o.data[0].domain : 'no response';
