@@ -1,8 +1,9 @@
 #!/bin/bash
 
 for zoom in {0..6}
-do 
+do
     num_tiles=$((2**zoom))
+
     for tile_x in $(seq 0 $(($num_tiles - 1)))
     do
         for tile_y in $(seq 0 $(($num_tiles - 1)))
@@ -12,32 +13,45 @@ do
 
             [ -s "$filename" ] ||
             (
-                echo 'P3 1024 1024 255'; 
-                clickhouse client --host driel7jwie.eu-west-1.aws.clickhouse-staging.com --secure --password "$PASSWORD" --query "
+                echo 'P3 1024 1024 255';
+                clickhouse client --host kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com --secure --password 'Mol_18sk0SDDI' --query "
                     WITH 1024 AS w, 1024 AS h, w * h AS pixels,
-                        cutToFirstSignificantSubdomain(domain) AS tld,
-                        sipHash64(tld) AS hash, 
-                        hash MOD 256 AS r, hash DIV 256 MOD 256 AS g, hash DIV 65536 MOD 256 AS b,
-                        toUInt32(ip) AS num,
 
-                        mortonDecode(2, num) AS src_coord,
+                        ((lon + 180) / 360) AS rel_x,
+                        1/2 - log(tan((lat + 90) / 360 * pi())) / 2 / pi() AS rel_y,
 
-                        bitShiftRight(65536, ${zoom}) AS crop_size,
-                        ${tile_x} * crop_size AS left,
-                        ${tile_y} * crop_size AS top,
-                        left + crop_size AS right,
-                        top + crop_size AS bottom,
+                        pow(2, ${zoom}) AS zoom_factor,
+                        (rel_x * zoom_factor)::UInt16 AS tile_x,
+                        (rel_y * zoom_factor)::UInt16 AS tile_y,
 
-                        (src_coord.1 >= left AND src_coord.1 < right) AND (src_coord.2 >= top AND src_coord.2 < bottom) AS in_tile,
+                        (1024 * (rel_x * zoom_factor - tile_x))::UInt16 AS x,
+                        (1024 * (rel_y * zoom_factor - tile_y))::UInt16 AS y,
 
-                        (src_coord.1 - left) DIV (crop_size DIV w) AS x,
-                        (src_coord.2 - top)  DIV (crop_size DIV h) AS y
+                        y * w + x AS pos,
 
-                    SELECT avg(r)::UInt8, avg(g)::UInt8, avg(b)::UInt8
-                    FROM dns_parsed
-                    WHERE in_tile
-                    GROUP BY x, y
-                    ORDER BY y * w + x WITH FILL FROM 0 TO 1024*1024
+                        count() AS total,
+                        sum(desc LIKE 'BOEING%') AS boeing,
+                        sum(desc LIKE 'AIRBUS%') AS airbus,
+                        sum(desc LIKE 'EMBRAER%') AS embraer,
+
+                        max(total) OVER () AS max_total,
+                        max(boeing) OVER () AS max_boeing,
+                        max(airbus) OVER () AS max_airbus,
+                        max(embraer) OVER () AS max_embraer,
+
+                        pow(total / max_total, 1/5) AS transparency,
+                        greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
+                        greatest(0, least(avg(ground_speed), 700)) / 700 AS color2,
+
+                        transparency * 255 AS r,
+                        transparency * color1 * 255 AS g,
+                        transparency * color2 * 255 AS b
+
+                        SELECT round(r), round(g), round(b)
+
+                        FROM planes
+                        WHERE tile_x = ${tile_x} AND tile_y = ${tile_y}
+                        GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024
                 " --progress
             ) | pnmtopng > $filename
 

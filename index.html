@@ -3,17 +3,17 @@
 <head>
     <meta charset="utf-8">
     <link rel="icon" href="favicon.png">
-    <title>Reverse DNS From IPv4 Space</title>
+    <title>Planes</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style type="text/css">
-        html, body, #space {
+        html, body, #map {
             width: 100%;
             height: 100%;
             padding: 0;
             margin: 0;
         }
 
-        #space {
+        #map {
             background: #111;
             image-rendering: pixelated;
         }
@@ -30,121 +30,35 @@
 </head>
 
 <body>
-    <div id="space"></div>
+    <div id="map"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
-        let map = L.map('space', {
-            crs: L.CRS.Simple,
-            center: [-512, 512],
-            maxBounds: [[1, -1], [-1025, 1025]],
-            zoom: 0,
+        let base_layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            //tileSize: 256,
+            zoomOffset: 0,
+            maxZoom: 19,
+            attribution: '© OpenStreetMap',
+            opacity: 0.1,
         });
 
-        L.tileLayer('tiles/{z}-{x}-{y}.png', {
-            width: 65536,
-            height: 65536,
+        let main_layer = L.tileLayer('tiles/{z}-{x}-{y}.png', {
             tileSize: 1024,
-            minZoom: -1,
-            maxZoom: 10,
+            zoomOffset: -2,
+            minZoom: 0,
+            maxZoom: 8,
             minNativeZoom: 0,
-            maxNativeZoom: 6,
-            attribution: '&copy; Alexey Milovidov, ClickHouse, Inc.'
-        }).addTo(map);
+            maxNativeZoom: 8,
+            attribution: '© Alexey Milovidov, ClickHouse, Inc.'
+        });
+
+        let map = L.map('map', {
+            center: [52.3676, 4.9041],
+            zoom: 5,
+            layers: [main_layer, base_layer]
+        });
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/reversedns.space/">About</a>');
-
-        function latLngToPixel(latlng) {
-            return { x: ((latlng.lng / 1024) * 65536)|0, y: ((-latlng.lat / 1024) * 65536)|0 };
-        }
-
-        function pixelToLatLng(pixel) {
-            return { lat: (-pixel.y - 0.5) / 65536 * 1024, lng: (pixel.x + 0.5) / 65536 * 1024 };
-        }
-
-        let popup = L.popup({maxWidth: 500});
-        let current_requested_ip = '';
-
-        function updateHistory() {
-            const state = {
-                zoom: map.getZoom(),
-                center: latLngToPixel(map.getCenter()),
-            };
-
-            let query = `?zoom=${state.zoom}&x=${state.center.x}&y=${state.center.y}`;
-
-            if (popup.isOpen() && map.getBounds().contains(popup.getLatLng())) {
-                state.popup = latLngToPixel(popup.getLatLng());
-                query += `&px=${state.popup.x}&py=${state.popup.y}`;
-            }
-
-            history.replaceState(state, '', query);
-        }
-
-        window.onpopstate = function(event) {
-            const state = event.state;
-            if (!state) {
-                return;
-            }
-
-            map.setView(pixelToLatLng(state.center), state.zoom);
-
-            if (state.popup) {
-                showPopup(state.popup.x, state.popup.y);
-            }
-        };
-
-        if (window.location.search) {
-            const params = new URLSearchParams(window.location.search);
-
-            map.setView(pixelToLatLng({x: params.get('x')|0, y: params.get('y')|0}), params.get('zoom'));
-
-            if (params.get('px') !== null && params.get('py') !== null) {
-                showPopup(params.get('px')|0, params.get('py')|0);
-            }
-        }
-
-        function showPopup(x, y) {
-            const xn = BigInt(x);
-            const yn = BigInt(y);
-            let ip_int = 0n;
-            for (let bit = 0n; bit < 16n; ++bit) {
-                ip_int |= ((xn >> bit) & 1n) << (bit * 2n);
-                ip_int |= ((yn >> bit) & 1n) << (1n + bit * 2n);
-            }
-
-            const ip_str = `${(ip_int >> 24n) & 0xFFn}.${(ip_int >> 16n) & 0xFFn}.${(ip_int >> 8n) & 0xFFn}.${(ip_int) & 0xFFn}`;
-            current_requested_ip = ip_str;
-
-            const response = fetch(
-                `https://driel7jwie.eu-west-1.aws.clickhouse-staging.com/?user=website`,
-                {
-                    method: 'POST',
-                    body: `SELECT encodeXMLComponent(domain) AS domain FROM dns_parsed WHERE ip = '${ip_str}' FORMAT JSON`
-                }).then(response => response.json().then(o => {
-
-                    let host = o.rows ? o.data[0].domain : 'no response';
-
-                    if (ip_str == current_requested_ip) {
-                        popup.setContent(`<b>${ip_str}</b><br/>${host}`);
-                    }
-                }));
-
-            popup
-                .setLatLng(pixelToLatLng({x: x, y: y}))
-                .setContent(`${ip_str}`)
-                .openOn(map);
-        }
-
-        map.on('click', e => {
-            const {x, y} = latLngToPixel(e.latlng);
-            if (x < 0 || x >= 65536 || y < 0 || y >= 65536) return;
-
-            showPopup(x, y);
-            updateHistory();
-        });
-
-        map.on('moveend', e => updateHistory());
     </script>
 </body>
 </html>
