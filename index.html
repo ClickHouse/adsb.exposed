@@ -107,21 +107,45 @@
             background: #666;
         }
 
-        #layers {
+        #layers, #provider {
             position: absolute;
+            padding: .3em .5em .2em .5em;
+            font-family: monospace;
+            color: black;
+            background: lightgray;
+            box-shadow: 2px 2px 10px rgba(0,0,0,1);
+            z-index: 1001;
+            user-select: none;
+        }
+
+        #layers {
             left: 1em;
             bottom: 1em;
             width: 2em;
             height: 2em;
             padding: .3em .5em .2em .5em;
             font-size: 16pt;
-            color: black;
-            background: lightgray;
             text-align: center;
-            box-shadow: 2px 2px 10px rgba(0,0,0,1);
-            z-index: 1001;
             cursor: pointer;
-            user-select: none;
+        }
+
+        #provider {
+            left: 4em;
+            bottom: 1em;
+            height: 2em;
+            padding: 0.1em .3em 0.1em 0.3em;
+            font-size: 16pt;
+
+        }
+
+        #provider form {
+            font-size: 12pt;
+            color: #333;
+        }
+
+        #provider * {
+            margin: 0;
+            padding: 0;
         }
     </style>
 </head>
@@ -152,6 +176,20 @@
     <div id="map"></div>
     <div id="error"></div>
     <div id="layers">👁</div>
+
+    <div id="provider">
+        <form>
+            <label>
+                <input type="radio" name="provider" value="self-hosted" checked>
+                Self-hosted
+            </label>
+            <br/>
+            <label>
+                <input type="radio" name="provider" value="cloud">
+                Cloud
+            </label>
+        </form>
+    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script>
@@ -837,7 +875,17 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             }
         });
 
-        const host = 'kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com';
+        function getHost() {
+            const provider = document.querySelector('input[name="provider"]:checked').value;
+            return provider == 'self-hosted' ?
+                'http://localhost:8123' :
+                'https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com';
+        }
+
+        document.querySelector('form').addEventListener('change', e => {
+            cached_tiles = {};
+            main_layer.redraw();
+        });
 
         let show_progress_bar = 0;
 
@@ -847,7 +895,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             let buf = cached_tiles[key];
             if (!buf) {
                 const query_id = `${uuid}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
-                const url = `https://${host}/?user=website&default_format=RowBinary` +
+                const host = getHost();
+                const url = `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
                     `&param_table=${table}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
@@ -937,7 +986,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 FROM clusterAllReplicas(default, system.processes)
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
-            const url = `https://${host}/?user=website&default_format=JSON&param_uuid=${uuid}`;
+            const host = getHost();
+            const url = `${host}/?user=website&default_format=JSON&param_uuid=${uuid}`;
 
             ++active_stat_queries;
             let response;
