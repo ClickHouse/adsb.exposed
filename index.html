@@ -305,16 +305,17 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    max(total) OVER () AS max_total,
+    greatest(1000000 DIV zoom_factor, count()) AS max_total,
+
     pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(altitude), 500)) / 500 AS color1,
+    greatest(0, least(avg(altitude), 5000)) / 5000 AS color3,
+    greatest(0, least(avg(ground_speed), 200)) / 200 AS color2,
 
-    greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
-    greatest(0, least(avg(ground_speed), 700)) / 700 AS color2,
-
-    255 * transparency AS r,
-    255 * color1 AS g,
-    255 * color2 AS b,
-    255 AS a
+    255 AS a,
+    (1 + transparency) / 2 * (1 - color3) * 255 AS r,
+    transparency * color1 * 255 AS g,
+    color2 * 255 AS b
 
 SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
 FROM {table:Identifier}
