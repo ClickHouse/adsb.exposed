@@ -309,8 +309,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
     greatest(0, least(avg(ground_speed), 700)) / 700 AS color2,
 
-    cityHash64(aircraft_category) AS hash,
-
     255 * transparency AS r,
     255 * color1 AS g,
     255 * color2 AS b,
@@ -414,8 +412,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
     greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
     greatest(0, least(avg(ground_speed), 700)) / 700 AS color2,
-
-    cityHash64(aircraft_category) AS hash,
 
     255 * transparency AS r,
     255 * color2 AS g,
@@ -715,8 +711,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
     greatest(0, least(avg(ground_speed), 100)) / 100 AS color2,
-
-    cityHash64(aircraft_category) AS hash,
 
     255 * color2 AS b,
     255 * transparency * (color1 + color2) / 2 AS g,
