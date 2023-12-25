@@ -197,12 +197,12 @@
     <div id="provider">
         <form>
             <label>
-                <input type="radio" name="provider" value="self-hosted" checked>
+                <input type="radio" name="provider" value="self-hosted">
                 Self-hosted
             </label>
             <br/>
             <label>
-                <input type="radio" name="provider" value="cloud">
+                <input type="radio" name="provider" value="cloud" checked>
                 Cloud
             </label>
         </form>
@@ -704,7 +704,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    max(total) OVER () AS max_total,
+    greatest(100000 DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -909,6 +909,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
 
+        /// Query editor
+
         function expandQueryEditor() {
             query_elem.style.height = query_elem.scrollHeight + 'px';
         }
@@ -963,6 +965,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             main_layer_sample100.redraw();
         });
 
+        /// Rendering
+
         let show_progress_bar = 0;
 
         async function render(table, coords, tile) {
@@ -1004,8 +1008,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
             let err = document.getElementById('error');
             err.style.display = 'none';
-
-            console.log(Object.keys(cached_tiles).length);
         }
 
         let cached_tiles = {};
@@ -1053,6 +1055,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             main_layer_sample10.addTo(map);
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color2)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color2)');
+            updateHistory();
         });
 
         main_layer_sample10.on('load', e => {
@@ -1069,6 +1072,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         });
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/reversedns.space/">About</a>');
+
+        /// Progress bar
 
         let active_stat_queries = 0;
         async function getStats() {
@@ -1117,6 +1122,83 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
         setInterval(getStats, 100);
 
+        /// Saved queries
+
+        function sipHash128(text) {
+            const m = (new TextEncoder).encode(text);
+
+            function rotl(v, offset, bits) {
+                v[offset] = (v[offset] << bits) | (v[offset] >> (64n - bits));
+            }
+
+            function compress(v) {
+                v[0] += v[1];
+                v[2] += v[3];
+                rotl(v, 1, 13n);
+                rotl(v, 3, 16n);
+                v[1] ^= v[0];
+                v[3] ^= v[2];
+                rotl(v, 0, 32n);
+                v[2] += v[1];
+                v[0] += v[3];
+                rotl(v, 1, 17n);
+                rotl(v, 3, 21n);
+                v[1] ^= v[2];
+                v[3] ^= v[0];
+                rotl(v, 2, 32n);
+            }
+
+            const view = new DataView(m.buffer);
+            let buf = new Uint8Array(new ArrayBuffer(8));
+            let v = new BigUint64Array([0x736f6d6570736575n, 0x646f72616e646f6dn, 0x6c7967656e657261n, 0x7465646279746573n]);
+
+            let offset = 0;
+            for (; offset < m.length - 7; offset += 8) {
+                let word = view.getBigUint64(offset, true);
+                v[3] ^= word;
+                compress(v);
+                compress(v);
+                v[0] ^= word;
+            }
+
+            buf.set(m.slice(offset));
+            buf.fill(0, m.length - offset, 7);
+            buf[7] = m.length;
+
+            let word = new DataView(buf.buffer).getBigUint64(0, true);
+
+            v[3] ^= word;
+            compress(v);
+            compress(v);
+            v[0] ^= word;
+            v[2] ^= 0xFFn;
+            compress(v);
+            compress(v);
+            compress(v);
+            compress(v);
+
+            return ('00000000000000000000000000000000' + ((v[0] ^ v[1]) + ((v[2] ^ v[3]) << 64n)).toString(16)).substr(-32).
+                match(/../g).reverse().join('');
+        }
+
+        async function saveQuery(text) {
+            const sql = `INSERT INTO saved_queries (text) FORMAT RawBLOB`;
+            const host = getHost();
+            const url = `${host}/?user=website_saved_queries&query=${encodeURIComponent(sql)}`;
+            const response = await fetch(url, { method: 'POST', body: text });
+        }
+
+        async function loadQuery(hash) {
+            const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
+            const host = getHost();
+            const url = `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
+            const response = await fetch(url, { method: 'POST', body: sql });
+            const data = await response.json();
+            return data.data[0].text;
+        }
+
+        /// History support
+
         document.getElementById('layers').addEventListener('click', e => {
             const mode = base_layer.options.opacity < 0.5;
 
@@ -1128,6 +1210,44 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 base_layer.bringToBack();
             }
         });
+
+        function updateHistory() {
+            const text = query_elem.value;
+            saveQuery(text);
+            const query_hash = sipHash128(text);
+
+            const state = {
+                zoom: map.getZoom(),
+                center: map.getCenter(),
+                query: text
+            };
+
+            const search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
+            history.replaceState(state, '', search);
+        }
+
+        window.onpopstate = function(event) {
+            const state = event.state;
+            if (!state) return;
+            query_elem.value = state.query;
+            map.setView(state.center, state.zoom);
+        };
+
+        if (window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const hash = params.get('query');
+            if (hash) {
+                loadQuery(hash).then(query => {
+                    query_elem.value = query;
+                    map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+                    collapseQueryEditor();
+                });
+            } else {
+                map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+            }
+        }
+
+        map.on('moveend', e => updateHistory());
     </script>
 </body>
 </html>
