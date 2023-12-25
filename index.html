@@ -8,6 +8,17 @@
     <style type="text/css">
         :root {
             --progress: 0%;
+            --progress-background-color1: #320;
+            --progress-foreground-color1: #840;
+
+            --progress-background-color2: #330;
+            --progress-foreground-color2: #880;
+
+            --progress-background-color3: #033;
+            --progress-foreground-color3: #088;
+
+            --progress-background-color: var(--progress-background-color3);
+            --progress-foreground-color: var(--progress-foreground-color3);
         }
         * {
             box-sizing: border-box;
@@ -30,8 +41,9 @@
         #query {
             width: 100%;
             min-width: 100%;
+            max-width: 100vw;
             height: 4.5em;
-            max-height: 40em;
+            max-height: 50vh;
             margin: 0;
             padding: .5em;
             outline: none;
@@ -76,7 +88,10 @@
         }
 
         #stats {
-            background: linear-gradient(to right, #033 0%, #088 var(--progress), #033 var(--progress));
+            background: linear-gradient(to right,
+                var(--progress-background-color) 0%,
+                var(--progress-foreground-color) var(--progress),
+                var(--progress-background-color) var(--progress));
             color: white;
             padding-right: .5em;
             font-family: monospace;
@@ -458,10 +473,10 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
     y * 1024 + x AS pos,
 
-    255 AS a,
+    255 * least(1, avg(abs(roll_angle)) / 10) AS a,
     255 * avg(max2(0, roll_angle)) / 21 AS r,
     255 * avg(min2(0, roll_angle)) / -21 AS g,
-    0 AS b
+    (1 - a) AS b
 
 SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
 FROM {table:Identifier}
@@ -698,15 +713,15 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     max(total) OVER () AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
-    greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
-    greatest(0, least(avg(ground_speed), 700)) / 700 AS color2,
+    greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
+    greatest(0, least(avg(ground_speed), 100)) / 100 AS color2,
 
     cityHash64(aircraft_category) AS hash,
 
-    255 * transparency AS r,
-    255 * color2 AS g,
-    255 * color1 AS b,
-    255 AS a
+    255 * color2 AS b,
+    255 * transparency * (color1 + color2) / 2 AS g,
+    255 * (1 - color1) AS r,
+    255 * (1 + transparency) / 2 AS a
 
 SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
 FROM {table:Identifier}
@@ -846,7 +861,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             }
 
             query_elem.blur();
-            main_layer.redraw();
+            main_layer_sample100.redraw();
         }
 
         function setQuery(value) {
@@ -878,18 +893,18 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         function getHost() {
             const provider = document.querySelector('input[name="provider"]:checked').value;
             return provider == 'self-hosted' ?
-                'http://localhost:8123' :
+                'https://fly-selfhosted-backend.clickhouse.com' :
                 'https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com';
         }
 
         document.querySelector('form').addEventListener('change', e => {
             cached_tiles = {};
-            main_layer.redraw();
+            main_layer_sample100.redraw();
         });
 
         let show_progress_bar = 0;
 
-        async function render(table, coords, tile, cache) {
+        async function render(table, coords, tile) {
             const sql = query_elem.value;
             const key = `${sql}-${table}-${coords.z}-${coords.x}-${coords.y}`;
             let buf = cached_tiles[key];
@@ -939,32 +954,57 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 let tile = L.DomUtil.create('canvas', 'leaflet-tile');
                 tile.width = 1024;
                 tile.height = 1024;
-
-                render('planes_mercator_sample100', coords, tile).then(err => {
-                    done(err, tile);
-                    render('planes_mercator_sample10', coords, tile).then(err => {
-                        render('planes_mercator', coords, tile);
-                    });
-                });
+                render(this.options.table, coords, tile).then(err => done(err, tile));
                 return tile;
             }
         });
 
-        let main_layer = new L.GridLayer.ClickHouse({
+        const layer_options = {
             tileSize: 1024,
             minZoom: 0,
             maxZoom: 19,
             minNativeZoom: 0,
             maxNativeZoom: 16,
-            attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: adsb.lol)'
-        });
+            attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: adsb.lol, adsbexchange.com)'
+        };
+
+        let layer_options_full = layer_options;
+        layer_options_full.table = 'planes_mercator';
+        let main_layer_full = new L.GridLayer.ClickHouse(layer_options_full);
+
+        let layer_options_sample10 = layer_options;
+        layer_options_sample10.table = 'planes_mercator_sample10';
+        let main_layer_sample10 = new L.GridLayer.ClickHouse(layer_options_sample10);
+
+        let layer_options_sample100 = layer_options;
+        layer_options_sample100.table = 'planes_mercator_sample100';
+        let main_layer_sample100 = new L.GridLayer.ClickHouse(layer_options_sample100);
 
         setQuery(queries[document.querySelector('#examples .selected').textContent]);
 
         let map = L.map('map', {
             center: [52.3676, 4.9041],
             zoom: 5,
-            layers: [main_layer, base_layer]
+            layers: [base_layer, main_layer_sample100]
+        });
+
+        main_layer_sample100.on('load', e => {
+            main_layer_sample10.addTo(map);
+            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color2)');
+            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color2)');
+        });
+
+        main_layer_sample10.on('load', e => {
+            main_layer_full.addTo(map);
+            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color3)');
+            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color3)');
+        });
+
+        main_layer_sample100.on('loading', e => {
+            main_layer_full.removeFrom(map);
+            main_layer_sample10.removeFrom(map);
+            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
+            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
         });
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/reversedns.space/">About</a>');
@@ -1017,7 +1057,15 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         setInterval(getStats, 100);
 
         document.getElementById('layers').addEventListener('click', e => {
-            base_layer.setOpacity(base_layer.options.opacity < 0.5 ? 1 : 0.1);
+            const mode = base_layer.options.opacity < 0.5;
+
+            if (mode) {
+                base_layer.setOpacity(0.5);
+                base_layer.bringToFront();
+            } else {
+                base_layer.setOpacity(0.1);
+                base_layer.bringToBack();
+            }
         });
     </script>
 </body>
