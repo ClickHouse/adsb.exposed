@@ -17,8 +17,11 @@
             --progress-background-color3: #033;
             --progress-foreground-color3: #088;
 
-            --progress-background-color: var(--progress-background-color3);
-            --progress-foreground-color: var(--progress-foreground-color3);
+            --progress-background-color4: #333;
+            --progress-foreground-color4: #333;
+
+            --progress-background-color: var(--progress-background-color4);
+            --progress-foreground-color: var(--progress-foreground-color4);
         }
         * {
             box-sizing: border-box;
@@ -1170,6 +1173,9 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
         main_layer_full.on('load', e => {
             show_progress_bar = false;
+            document.documentElement.style.setProperty('--progress', '0');
+            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
+            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
         });
 
         main_layer_sample100.on('loading', e => {
