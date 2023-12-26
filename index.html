@@ -178,6 +178,7 @@
         <span>Supersonic</span>
         <span>Light</span>
         <span>Gliders</span>
+        <span>Ultralight</span>
         <span>Military</span>
         <span>Vertical Speed</span>
         <span>Roll Angle</span>
@@ -726,6 +727,41 @@ FROM {table:Identifier}
 WHERE in_tile AND aircraft_category = 'B1'
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
+"Ultralight": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt16} AS tile_x_begin,
+    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt16} AS tile_y_begin,
+    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    pow(total / max_total, 1/5) AS transparency,
+
+    greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
+    greatest(0, least(avg(ground_speed), 100)) / 100 AS color2,
+
+    255 * color2 AS b,
+    255 * transparency * (color1 + color2) / 2 AS g,
+    255 * (1 - color1) AS r,
+    255 * (1 + transparency) / 2 AS a
+
+SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND aircraft_category = 'B4'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
 "Event Time": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -1207,7 +1243,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
             const host = getHost();
-            const url = `${host}/?user=website&default_format=JSON&param_uuid=${uuid}`;
+            const url = `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
 
             ++active_stat_queries;
             let response;
