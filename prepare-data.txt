@@ -1,0 +1,26 @@
+# https://github.com/adsblol/globe_history
+
+for i in {1..100}; do curl -sS https://api.github.com/repos/adsblol/globe_history/releases?page=$i | jq '.[].assets[] | {name: .name, url: .url}' | tee $i.json; done
+
+cat *.json | jq -c '.' | grep prod | sed -r 's/\{"name":"(.+?)","url":"(.+?)"\}/\1 \2/' | while read name url; do wget -O $name --continue https://github.com/adsblol/globe_history/releases/download/${name%.tar}/${name}; done
+
+for i in *.tar; do echo $i && mkdir ${i%.tar} && (cd ${i%.tar} && tar xf ../$i) && rm $i; done
+
+find *readsb*/traces -name '*.json' | xargs -P $(nproc) -L1 ~/process-file.sh
+
+
+# https://www.adsbexchange.com/products/historical-data/
+
+wget --recursive https://samples.adsbexchange.com/readsb-hist/
+
+for dir in */*/01/; do grep -o -P '<a href=".+?\.json\.gz">.+?</a>' $dir/index.html | sed -r -e 's!<a href="(.+?)">.+?</a>!https://samples.adsbexchange.com/readsb-hist/'$dir'\1!'; done > links.txt
+
+cat links.txt | xargs -P10 wget --continue -x
+
+wget --recursive https://samples.adsbexchange.com/hires-traces/
+
+for dir in */*/01/??/; do grep -o -P '<a href=".+?\.json(\.gz)?">.+?</a>' $dir/index.html | sed -r -e 's!<a href="(.+?)">.+?</a>!https://samples.adsbexchange.com/hires-traces/'$dir'\1!'; done > links2.txt
+
+cat links2.txt | xargs -P10 wget --continue -x
+
+find . -name index.html | xargs awk '{ print $5 }' | grep '.' | clickhouse-local --input-format LineAsString --query "WITH toUInt64OrZero(extract(line, '\\d+')) * transform(extract(line, '(K|M|G)\\s*\$'), ['', 'K', 'M', 'G'], [1, 1024, 1024  * 1024, 1024 * 1024 * 1024], 0) AS bytes SELECT sum(bytes) FROM table" --progress
