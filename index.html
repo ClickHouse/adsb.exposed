@@ -187,6 +187,9 @@
         <span>N2163J</span>
         <span>Event Time</span>
         <span>Weekends</span>
+        <span>Emergency</span>
+        <span>Balloons</span>
+        <span>Ground Vehicles</span>
         <span>Elon Musk</span>
     </div>
     <div id="stats"></div>
@@ -893,6 +896,107 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
 FROM {table:Identifier}
 WHERE in_tile AND ground_speed > 0 AND ground_speed < 50 AND abs(vertical_rate) > 5000
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Emergency": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt16} AS tile_x_begin,
+    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt16} AS tile_y_begin,
+    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    transform(aircraft_emergency,
+              ['general', 'nordo', 'downed', 'lifeguard', 'reserved', 'unlawful', 'minfuel'],
+              [0x0000FF, 0xFF0000, 0xFFFF00, 0x00FF00, 0x00FFFF, 0xFF00FF, 0xFFFFFF], 0) AS color,
+
+    255 AS a,
+    avg(color DIV 0x10000) AS r,
+    avg(color DIV 0x100 MOD 0x100) AS g,
+    avg(color MOD 0x100) AS b
+
+SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
+FROM {table:Identifier} AS t
+WHERE in_tile AND aircraft_emergency NOT IN ('', 'none')
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Balloons": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt16} AS tile_x_begin,
+    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt16} AS tile_y_begin,
+    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000 DIV zoom_factor, count()) AS max_total,
+    pow(total / max_total, 1/5) AS transparency,
+
+    greatest(0, least(avg(altitude), 10000)) / 10000 AS color1,
+    greatest(0, least(avg(ground_speed), 100)) / 100 AS color2,
+
+    255 * color2 AS b,
+    255 * color1 AS r,
+    255 * (1 - color1) AS g,
+    255 * transparency AS a
+
+SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND aircraft_category = 'B2'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Ground Vehicles": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt16} AS tile_x_begin,
+    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt16} AS tile_y_begin,
+    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000 DIV zoom_factor, count()) AS max_total,
+    pow(total / max_total, 1/5) AS transparency,
+
+    greatest(0, least(avg(ground_speed), 50)) / 50 AS color,
+
+    255 * transparency * color AS g,
+    255 * (1 - color) AS r,
+    255 * color AS b,
+    255 AS a
+
+SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND aircraft_category IN ('C1', 'C2')
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         };
 
@@ -967,7 +1071,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
         /// Rendering
 
-        let show_progress_bar = 0;
+        let show_progress_bar = false;
 
         async function render(table, coords, tile) {
             const sql = query_elem.value;
@@ -981,7 +1085,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     `&param_table=${table}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
-                show_progress_bar = 10;
+                show_progress_bar = true;
                 const response = await fetch(url, { method: 'POST', body: sql });
 
                 if (!response.ok) {
@@ -1064,6 +1168,10 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color3)');
         });
 
+        main_layer_full.on('load', e => {
+            show_progress_bar = false;
+        });
+
         main_layer_sample100.on('loading', e => {
             main_layer_full.removeFrom(map);
             main_layer_sample10.removeFrom(map);
@@ -1077,7 +1185,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
         let active_stat_queries = 0;
         async function getStats() {
-            if (show_progress_bar <= 0 || active_stat_queries > 0) return;
+            if (!show_progress_bar || active_stat_queries > 0) return;
 
             const sql = `SELECT
                     sum(read_rows) AS r,
@@ -1116,7 +1224,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 document.getElementById('stats').textContent = text;
             } else {
                 document.documentElement.style.setProperty('--progress', '0');
-                --show_progress_bar;
             }
         }
 
