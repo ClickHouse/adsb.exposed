@@ -817,5 +817,39 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
 FROM {table:Identifier}
 WHERE in_tile AND aircraft_category IN ('C1', 'C2')
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"All Airlines": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt16} AS tile_x_begin,
+    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt16} AS tile_y_begin,
+    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    pow(total / max_total, 1/5) AS transparency,
+
+    cityHash64(substring(aircraft_flight, 1, 3)) AS hash,
+
+    transparency * 255 AS a,
+    avg(hash MOD 256) AS r,
+    avg(hash DIV 256 MOD 256) AS g,
+    avg(hash DIV 65536 MOD 256) AS b
+
+SELECT round(r)::UInt8, round(g)::UInt8, round(b)::UInt8, round(a)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND aircraft_flight != '' -- AND aircraft_category = 'A3'
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 };
