@@ -322,7 +322,7 @@
             }
 
             let ctx = tile.getContext('2d');
-            let image = ctx.createImageData(1024, 1024);
+            let image = ctx.createImageData(1024, 1024, {colorSpace: 'display-p3'});
             let arr = new Uint8ClampedArray(buf);
 
             for (let i = 0; i < 1024 * 1024 * 4; ++i) { image.data[i] = arr[i]; }
