@@ -509,9 +509,13 @@
         select_toggle.addEventListener('click', e => {
             select_toggle_active = !select_toggle_active;
             select_toggle.style.backgroundColor = select_toggle_active ? 'orange' : '';
-            select_toggle_active ? map.dragging.disable() : map.dragging.enable();
 
-            if (!select_toggle_active) {
+            if (select_toggle_active) {
+                map.dragging.disable();
+                map_elem.style.cursor = 'crosshair';
+            } else {
+                map.dragging.enable();
+                map_elem.style.cursor = '';
                 hideSelection();
                 hideReport();
             }
@@ -532,7 +536,13 @@
             while (elem.firstChild) elem.removeChild(elem.firstChild);
         }
 
+        /// Protect from race conditions.
+        let report_sequence_num = 0;
+
         function showReport() {
+            ++report_sequence_num;
+            const current_report_sequence_num = report_sequence_num;
+
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
             document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
@@ -622,6 +632,8 @@
 
             function createList(sql, field, elem_id, title, separator, link_content_func) {
                 calculateReport(sql).then(json => {
+                    if (current_report_sequence_num != report_sequence_num) return;
+
                     let elem = document.getElementById(elem_id);
                     clearContainer(elem);
                     elem.appendChild(document.createTextNode(title));
