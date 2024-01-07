@@ -268,6 +268,7 @@
 
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
+        let selected_box = [];
 
         /// Query editor
 
@@ -290,6 +291,7 @@
         function setQuery(value) {
             query_elem.value = value;
             collapseQueryEditor();
+            if (selected_box.length) showReport();
         }
 
         for (elem of document.querySelectorAll('#examples span')) {
@@ -429,7 +431,6 @@
             document.documentElement.style.setProperty('--progress', '0');
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
-            if (selected_box.length) showReport();
         });
 
         main_layer_sample100.on('loading', e => {
@@ -446,7 +447,6 @@
         let selection = document.getElementById('selection');
         let selecting = false;
         let selection_origin_point = {x: 0, y: 0};
-        let selected_box = [];
 
         function latlngToMercator(latlng) {
             return {
@@ -456,6 +456,7 @@
         }
 
         function showReport() {
+            for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
             document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
 
