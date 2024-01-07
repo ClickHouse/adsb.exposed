@@ -152,6 +152,21 @@
         #report div {
             margin-bottom: 1em;
             white-space: pre-wrap;
+            color: lightgray;
+        }
+
+        #report a {
+            color: white;
+            border-bottom: 1px dashed #888;
+            cursor: pointer;
+        }
+
+        #report a:hover {
+            color: #FC0;
+            background: black;
+            border-bottom: 1px dashed #FC0;
+            box-shadow: 0px 0px 10px rgba(0,0,0,1);
+            font-weight: bold;
         }
 
         #layers, #provider {
@@ -417,6 +432,7 @@
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
 
+        /// Restore from a saved link
         if (window.location.search) {
             const params = new URLSearchParams(window.location.search);
             const hash = params.get('query');
@@ -428,6 +444,11 @@
                 });
             } else {
                 map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+            }
+            const box = params.get('box');
+            if (box) {
+                const arr = box.split(',');
+                selected_box = [{x: arr[0], y: arr[1]}, {x: arr[2], y: arr[3]}];
             }
         }
 
@@ -473,6 +494,10 @@
             };
         }
 
+        function clearContainer(elem) {
+            while (elem.firstChild) elem.removeChild(elem.firstChild);
+        }
+
         function showReport() {
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
@@ -499,7 +524,7 @@
             const sql_flights = `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT trimRight(aircraft_flight) AS flight, count() AS c
+                SELECT aircraft_flight, count() AS c
                 FROM {table:Identifier}
                 WHERE flight != '' AND NOT startsWith(flight, '@@@') AND ${condition}
                 GROUP BY flight
@@ -561,6 +586,32 @@
                 return json;
             }
 
+            function createList(sql, field, elem_id, title, separator, link_content_func) {
+                calculateReport(sql).then(json => {
+                    let elem = document.getElementById(elem_id);
+                    clearContainer(elem);
+                    elem.appendChild(document.createTextNode(title));
+                    for (const [idx, row] of json.data.entries()) {
+                        if (idx) {
+                            let comma = document.createTextNode(separator);
+                            elem.appendChild(comma);
+                        }
+                        let link = document.createElement('a');
+                        link.textContent = link_content_func(row);
+                        link.addEventListener('click', e => {
+                            let condition = `${field} = '${row[field]}'`; /// SQL injection, but ok.
+                            let changed_query = current_query.replace(
+                                /(WHERE.+?)(\/\* Filter: \*\/ AND .+)?(GROUP BY)/is,
+                                '$1' + '/* Filter: */ AND ' + condition + '\n$3');
+
+                            setQuery(changed_query);
+                        });
+                        elem.appendChild(link);
+                    }
+                    if (json.data.length >= 100) elem.appendChild(document.createTextNode('…'));
+                });
+            }
+
             calculateReport(sql_total).then(json => {
                 const row = json.data[0];
                 document.getElementById('report_total').textContent = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.aircrafts).toLocaleString()} flight nums. Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
@@ -570,21 +621,10 @@
                 }
             });
 
-            calculateReport(sql_flights).then(json => {
-                document.getElementById('report_flights').textContent = 'Flights: ' + json.data.map(row => row.flight).join(', ') + (json.data.length >= 100 ? '…' : '')
-            });
-
-            calculateReport(sql_types).then(json => {
-                document.getElementById('report_types').textContent = 'Types: \n' + json.data.map(row => `${row.t} (${row.desc})`).join(',\n') + (json.data.length >= 100 ? '…' : '');
-            });
-
-            calculateReport(sql_registration).then(json => {
-                document.getElementById('report_regs').textContent = 'Registration: ' + json.data.map(row => row.r).join(', ') + (json.data.length >= 100 ? '…' : '');
-            });
-
-            calculateReport(sql_owner).then(json => {
-                document.getElementById('report_owners').textContent = 'Owner: \n' + json.data.map(row => row.ownOp).join(',\n') + (json.data.length >= 100 ? '…' : '');
-            });
+            createList(sql_flights, 'aircraft_flight', 'report_flights', 'Flights: ', ', ', (row => row.aircraft_flight));
+            createList(sql_types, 't', 'report_types', 'Types:\n', ',\n', (row => `${row.t} (${row.desc})`));
+            createList(sql_registration, 'r', 'report_regs', 'Registration: ', ', ', (row => row.r));
+            createList(sql_owner, 'ownOp', 'report_owners', 'Owner:\n', ',\n', (row => row.ownOp));
         }
 
         function hideReport() {
@@ -646,6 +686,7 @@
             } else {
                 selected_box[1] = latlngToMercator(e.latlng);
                 showReport();
+                updateHistory();
             }
         });
 
@@ -796,10 +837,12 @@
             const state = {
                 zoom: map.getZoom(),
                 center: map.getCenter(),
-                query: text
+                query: text,
+                box: selected_box,
             };
 
-            const search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
+            let search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
+            if (selected_box.length == 2) search += `&box=${selected_box[0].x},${selected_box[0].y},${selected_box[1].x},${selected_box[1].y}`;
             history.replaceState(state, '', search);
         }
 
@@ -808,6 +851,10 @@
             if (!state) return;
             query_elem.value = state.query;
             map.setView(state.center, state.zoom);
+            if (state.selected_box.length == 2) {
+                selected_box = state.selected_box;
+                showReport();
+            }
         };
 
         map.on('movestart', e => hideSelection());

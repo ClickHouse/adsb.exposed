@@ -34,7 +34,7 @@ clickhouse-local --query "
         aircraft.version,
         aircraft.category,
         aircraft.emergency,
-        aircraft.flight,
+        trimRight(aircraft.flight),
         aircraft.squawk,
         aircraft.baro_rate,
         aircraft.nav_altitude_fms,
