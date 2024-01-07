@@ -22,6 +22,8 @@
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
+
+            --report-width: 0%;
         }
         * {
             box-sizing: border-box;
@@ -36,12 +38,13 @@
 
         body {
             display: grid;
-            grid-template-columns: auto;
+            grid-template-columns: auto var(--report-width);
             grid-template-rows: fit-content(10%) fit-content(2em) 1em auto;
             grid-gap: 0;
         }
 
         #query {
+            grid-column: span 2;
             width: 100%;
             min-width: 100%;
             max-width: 100vw;
@@ -90,7 +93,16 @@
             max-width: 80%;
         }
 
+        #selection {
+            display: none;
+            position: absolute;
+            z-index: 1001;
+            border: 1px solid #888;
+            backdrop-filter: brightness(150%);
+        }
+
         #stats {
+            grid-column: span 2;
             background: linear-gradient(to right,
                 var(--progress-background-color) 0%,
                 var(--progress-foreground-color) var(--progress),
@@ -102,6 +114,7 @@
         }
 
         #examples {
+            grid-column: span 2;
             background: #202020;
             color: white;
             font-size: 12pt;
@@ -123,6 +136,22 @@
 
         #examples span.selected {
             background: #666;
+        }
+
+        #report {
+            color: white;
+            font-size: 12pt;
+            font-family: monospace;
+            background: #202020;
+            padding: .5em;
+            display: none;
+            max-height: 100%;
+            overflow-y: scroll;
+        }
+
+        #report div {
+            margin-bottom: 1em;
+            white-space: pre-wrap;
         }
 
         #layers, #provider {
@@ -171,7 +200,7 @@
 <body>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
     <div id="examples">Examples:
-        <span class="selected">Speed &amp; Velocity</span>
+        <span class="selected">Altitude &amp; Velocity</span>
         <span>Boeing vs. Airbus</span>
         <span>Helicopters</span>
         <span>Hi-Performance</span>
@@ -198,7 +227,15 @@
         <span>All Airlines</span>
     </div>
     <div id="stats"></div>
-    <div id="map"></div>
+    <div id="map"><div id="selection"></div></div>
+    <div id="report">
+        <div id="report_total"></div>
+        <div id="report_time"></div>
+        <div id="report_types"></div>
+        <div id="report_flights"></div>
+        <div id="report_owners"></div>
+        <div id="report_regs"></div>
+    </div>
     <div id="error"></div>
     <div id="layers">👁</div>
 
@@ -392,6 +429,7 @@
             document.documentElement.style.setProperty('--progress', '0');
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
+            if (selected_box.length) showReport();
         });
 
         main_layer_sample100.on('loading', e => {
@@ -402,6 +440,195 @@
         });
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
+
+        /// Rectangle selection
+
+        let selection = document.getElementById('selection');
+        let selecting = false;
+        let selection_origin_point = {x: 0, y: 0};
+        let selected_box = [];
+
+        function latlngToMercator(latlng) {
+            return {
+                x: Math.round(0xFFFFFFFF * ((latlng.lng + 180) / 360)),
+                y: Math.round(0xFFFFFFFF * (1/2 - Math.log(Math.tan((latlng.lat + 90) / 360 * Math.PI)) / 2 / Math.PI))
+            };
+        }
+
+        function showReport() {
+            document.getElementById('report').style.display = 'block';
+            document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
+
+            const current_query = query_elem.value;
+
+            /// This is fairly dirty.
+            const condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
+
+            const sql_total = `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT
+                    count() AS traces,
+                    uniq(r) AS aircrafts,
+                    uniq(t) AS types,
+                    uniqIf(aircraft_flight,
+                    aircraft_flight != '') AS flights,
+                    min(time) AS first, max(time) AS last
+                FROM {table:Identifier}
+                WHERE ${condition}`;
+
+            const sql_flights = `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT trimRight(aircraft_flight) AS flight, count() AS c
+                FROM {table:Identifier}
+                WHERE flight != '' AND NOT startsWith(flight, '@@@') AND ${condition}
+                GROUP BY flight
+                ORDER BY c DESC
+                LIMIT 100`;
+
+            const sql_types = `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT t, any(desc) AS desc, count() AS c
+                FROM {table:Identifier}
+                WHERE t != '' AND ${condition}
+                GROUP BY t
+                ORDER BY c DESC
+                LIMIT 100`;
+
+            const sql_registration = `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT r, count() AS c
+                FROM {table:Identifier}
+                WHERE r != '' AND ${condition}
+                GROUP BY r
+                ORDER BY c DESC
+                LIMIT 100`;
+
+            const sql_owner = `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT ownOp, count() AS c
+                FROM {table:Identifier}
+                WHERE ownOp != '' AND ${condition}
+                GROUP BY ownOp
+                ORDER BY c DESC
+                LIMIT 100`;
+
+            async function calculateReport(sql) {
+                const host = getHost();
+                const url = `${host}/?user=website&default_format=JSON` +
+                    `&param_table=planes_mercator` +
+                    `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
+                    `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
+                    `&param_top=${Math.min(selected_box[0].y, selected_box[1].y)}` +
+                    `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
+
+                const response = await fetch(url, { method: 'POST', body: sql });
+
+                if (!response.ok) {
+                    const text = await response.text();
+                    if (!text.includes('QUERY_WAS_CANCELLED') && !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
+                        let err = document.getElementById('error');
+                        err.textContent = text;
+                        err.style.display = 'block';
+                    }
+                    return;
+                }
+
+                const json = await response.json();
+                return json.data;
+            }
+
+            console.log(condition);
+
+            calculateReport(sql_total).then(data => {
+                const row = data[0];
+                document.getElementById('report_total').textContent = `Total ${row.traces} traces, ${row.aircrafts} aircrafts of ${row.types} types, ${row.flights} flight nums.`;
+                document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
+            });
+
+            calculateReport(sql_flights).then(data => {
+                document.getElementById('report_flights').textContent = 'Flights: ' + data.map(row => row.flight).join(', ') + (data.length >= 100 ? '…' : '')
+            });
+
+            calculateReport(sql_types).then(data => {
+                document.getElementById('report_types').textContent = 'Types: \n' + data.map(row => `${row.t} (${row.desc})`).join(',\n') + (data.length >= 100 ? '…' : '');
+            });
+
+            calculateReport(sql_registration).then(data => {
+                document.getElementById('report_regs').textContent = 'Registration: ' + data.map(row => row.r).join(', ') + (data.length >= 100 ? '…' : '');
+            });
+
+            calculateReport(sql_owner).then(data => {
+                document.getElementById('report_owners').textContent = 'Owner: \n' + data.map(row => row.ownOp).join(',\n') + (data.length >= 100 ? '…' : '');
+            });
+        }
+
+        function hideReport() {
+            selected_box = [];
+            document.getElementById('report').style.display = 'none';
+            document.documentElement.style.setProperty('--report-width', '0%');
+        }
+
+        function hideSelection() {
+            selection.style.display = 'none';
+            hideReport();
+        }
+
+        map.on('contextmenu', e => {
+            return false;
+        });
+
+        map.on('mousedown', e => {
+            if (e.originalEvent.button !== 2) return;
+
+            selection_origin_point.x = Math.round(e.originalEvent.clientX);
+            selection_origin_point.y = Math.round(e.originalEvent.clientY);
+
+            selected_box[0] = latlngToMercator(e.latlng);
+
+            selection.style.display = 'block';
+            selection.style.left = Math.round(e.containerPoint.x) + 'px';
+            selection.style.top = Math.round(e.containerPoint.y) + 'px';
+            selection.style.width = 0;
+            selection.style.height = 0;
+            selecting = true;
+        });
+
+        map.on('mousemove', e => {
+            if (!selecting) return;
+
+            if (e.originalEvent.clientX >= selection_origin_point.x) {
+                selection.style.width = Math.round(e.originalEvent.clientX - selection_origin_point.x) + 'px';
+            } else {
+                selection.style.left = Math.round(e.containerPoint.x) + 'px';
+                selection.style.width = Math.round(selection_origin_point.x - e.originalEvent.clientX) + 'px';
+            }
+
+            if (e.originalEvent.clientY >= selection_origin_point.y) {
+                selection.style.height = Math.round(e.originalEvent.clientY - selection_origin_point.y) + 'px';
+            } else {
+                selection.style.top = Math.round(e.containerPoint.y) + 'px';
+                selection.style.height = Math.round(selection_origin_point.y - e.originalEvent.clientY) + 'px';
+            }
+        });
+
+        map.on('mouseup', e => {
+            if (e.originalEvent.button !== 2) return;
+            selecting = false;
+
+            if (selection_origin_point.x == Math.round(e.originalEvent.clientX) &&
+                selection_origin_point.y == Math.round(e.originalEvent.clientY)) {
+                hideSelection();
+            } else {
+                selected_box[1] = latlngToMercator(e.latlng);
+                console.log(selected_box);
+                showReport();
+            }
+        });
 
         /// Progress bar
 
@@ -576,6 +803,7 @@
             }
         }
 
+        map.on('movestart', e => hideSelection());
         map.on('moveend', e => updateHistory());
     </script>
 </body>

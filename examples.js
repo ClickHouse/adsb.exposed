@@ -1,5 +1,5 @@
 let queries = {
-"Speed & Velocity": `WITH
+"Altitude & Velocity": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
