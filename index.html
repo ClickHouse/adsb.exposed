@@ -97,7 +97,7 @@
             display: none;
             position: absolute;
             z-index: 1001;
-            border: 1px solid #888;
+            border: 1px dashed white;
             backdrop-filter: brightness(150%);
         }
 
@@ -330,7 +330,7 @@
 
         let show_progress_bar = false;
 
-        async function render(table, coords, tile) {
+        async function render(table, priority, coords, tile) {
             const sql = query_elem.value;
             const key = `${sql}-${table}-${coords.z}-${coords.x}-${coords.y}`;
             let buf = cached_tiles[key];
@@ -338,7 +338,7 @@
                 const query_id = `${uuid}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
                 const host = getHost();
                 const url = `${host}/?user=website&default_format=RowBinary` +
-                    `&query_id=${query_id}&replace_running_query=1` +
+                    `&query_id=${query_id}&priority=${priority}&replace_running_query=1` +
                     `&param_table=${table}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
@@ -378,7 +378,7 @@
                 let tile = L.DomUtil.create('canvas', 'leaflet-tile');
                 tile.width = 1024;
                 tile.height = 1024;
-                render(this.options.table, coords, tile).then(err => done(err, tile));
+                render(this.options.table, this.options.priority, coords, tile).then(err => done(err, tile));
                 return tile;
             }
         });
@@ -394,14 +394,17 @@
 
         let layer_options_full = layer_options;
         layer_options_full.table = 'planes_mercator';
+        layer_options_full.priority = 3;
         let main_layer_full = new L.GridLayer.ClickHouse(layer_options_full);
 
         let layer_options_sample10 = layer_options;
         layer_options_sample10.table = 'planes_mercator_sample10';
+        layer_options_full.priority = 2;
         let main_layer_sample10 = new L.GridLayer.ClickHouse(layer_options_sample10);
 
         let layer_options_sample100 = layer_options;
         layer_options_sample100.table = 'planes_mercator_sample100';
+        layer_options_full.priority = 1;
         let main_layer_sample100 = new L.GridLayer.ClickHouse(layer_options_sample100);
 
         setQuery(queries[document.querySelector('#examples .selected').textContent]);
@@ -409,8 +412,26 @@
         let map = L.map('map', {
             center: [52.3676, 4.9041],
             zoom: 5,
-            layers: [base_layer, main_layer_sample100]
+            layers: [base_layer]
         });
+
+        map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
+
+        if (window.location.search) {
+            const params = new URLSearchParams(window.location.search);
+            const hash = params.get('query');
+            if (hash) {
+                loadQuery(hash).then(query => {
+                    query_elem.value = query;
+                    map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+                    collapseQueryEditor();
+                });
+            } else {
+                map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+            }
+        }
+
+        main_layer_sample100.addTo(map);
 
         main_layer_sample100.on('load', e => {
             main_layer_sample10.addTo(map);
@@ -438,8 +459,6 @@
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
         });
-
-        map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
 
         /// Rectangle selection
 
@@ -753,7 +772,7 @@
             return data.data[0].text;
         }
 
-        /// History support
+        /// Layers visibility toggle
 
         document.getElementById('layers').addEventListener('click', e => {
             const mode = base_layer.options.opacity < 0.5;
@@ -766,6 +785,8 @@
                 base_layer.bringToBack();
             }
         });
+
+        /// History support
 
         function updateHistory() {
             const text = query_elem.value;
@@ -788,20 +809,6 @@
             query_elem.value = state.query;
             map.setView(state.center, state.zoom);
         };
-
-        if (window.location.search) {
-            const params = new URLSearchParams(window.location.search);
-            const hash = params.get('query');
-            if (hash) {
-                loadQuery(hash).then(query => {
-                    query_elem.value = query;
-                    map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
-                    collapseQueryEditor();
-                });
-            } else {
-                map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
-            }
-        }
 
         map.on('movestart', e => hideSelection());
         map.on('moveend', e => updateHistory());
