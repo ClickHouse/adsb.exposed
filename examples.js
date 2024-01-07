@@ -54,8 +54,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    sum(desc LIKE 'BOEING%') AS blueoeing,
-    sum(desc LIKE 'AIRBUS%') AS alphairbus,
+    sum(desc LIKE 'BOEING%') AS boeing,
+    sum(desc LIKE 'AIRBUS%') AS airbus,
     sum(NOT (desc LIKE 'BOEING%' OR desc LIKE 'AIRBUS%')) AS other,
 
     greatest(1000000 DIV zoom_factor, total) AS max_total,
@@ -198,7 +198,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
     y * 1024 + x AS pos,
 
-    least(255, 2 * greatest(r, g)) AS alpha,
+    least(255, 2 * greatest(red, green)) AS alpha,
     255 * least(1, avg(greatest(0, vertical_rate)) / 5000) AS green,
     255 * least(1, avg(least(0, vertical_rate)) / -5000) AS red,
     0 AS blue
@@ -229,7 +229,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     255 * least(1, avg(abs(roll_angle)) / 10) AS alpha,
     255 * avg(max2(0, roll_angle)) / 21 AS red,
     255 * avg(min2(0, roll_angle)) / -21 AS green,
-    (1 - a) AS blue
+    (1 - alpha) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -262,7 +262,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     255 * transparency AS alpha,
     255 * avg(year < 2000) AS red,
     255 * avg(year >= 2010) AS green,
-    a AS blue
+    alpha AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -534,7 +534,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     min(offset) OVER () AS min_offset,
     max(offset) OVER () AS max_offset,
 
-    (1 + offset - min_offset) / (1 + max_offset - min_offset) AS redel_time,
+    (1 + offset - min_offset) / (1 + max_offset - min_offset) AS rel_time,
 
     255 AS alpha,
     255 * rel_time AS green,

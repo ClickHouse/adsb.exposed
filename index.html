@@ -285,7 +285,7 @@
 
             query_elem.blur();
             main_layer_sample100.redraw();
-            if (selected_box.length) showReport();
+            if (selected_box.length == 2) showReport();
         }
 
         function setQuery(value) {
@@ -490,7 +490,7 @@
             const sql_types = `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT t, any(desc) AS desc, count() AS c
+                SELECT t, anyIf(desc, desc != '') AS desc, count() AS c
                 FROM {table:Identifier}
                 WHERE t != '' AND ${condition}
                 GROUP BY t
@@ -539,33 +539,32 @@
                 }
 
                 const json = await response.json();
-                return json.data;
+                return json;
             }
 
-            console.log(condition);
+            calculateReport(sql_total).then(json => {
+                const row = json.data[0];
+                document.getElementById('report_total').textContent = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.aircrafts).toLocaleString()} flight nums. Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
 
-            calculateReport(sql_total).then(data => {
-                const row = data[0];
-                document.getElementById('report_total').textContent = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.flights).toLocaleString()} flight nums.`;
                 if (row.traces > 0) {
                     document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
                 }
             });
 
-            calculateReport(sql_flights).then(data => {
-                document.getElementById('report_flights').textContent = 'Flights: ' + data.map(row => row.flight).join(', ') + (data.length >= 100 ? '…' : '')
+            calculateReport(sql_flights).then(json => {
+                document.getElementById('report_flights').textContent = 'Flights: ' + json.data.map(row => row.flight).join(', ') + (json.data.length >= 100 ? '…' : '')
             });
 
-            calculateReport(sql_types).then(data => {
-                document.getElementById('report_types').textContent = 'Types: \n' + data.map(row => `${row.t} (${row.desc})`).join(',\n') + (data.length >= 100 ? '…' : '');
+            calculateReport(sql_types).then(json => {
+                document.getElementById('report_types').textContent = 'Types: \n' + json.data.map(row => `${row.t} (${row.desc})`).join(',\n') + (json.data.length >= 100 ? '…' : '');
             });
 
-            calculateReport(sql_registration).then(data => {
-                document.getElementById('report_regs').textContent = 'Registration: ' + data.map(row => row.r).join(', ') + (data.length >= 100 ? '…' : '');
+            calculateReport(sql_registration).then(json => {
+                document.getElementById('report_regs').textContent = 'Registration: ' + json.data.map(row => row.r).join(', ') + (json.data.length >= 100 ? '…' : '');
             });
 
-            calculateReport(sql_owner).then(data => {
-                document.getElementById('report_owners').textContent = 'Owner: \n' + data.map(row => row.ownOp).join(',\n') + (data.length >= 100 ? '…' : '');
+            calculateReport(sql_owner).then(json => {
+                document.getElementById('report_owners').textContent = 'Owner: \n' + json.data.map(row => row.ownOp).join(',\n') + (json.data.length >= 100 ? '…' : '');
             });
         }
 
@@ -619,7 +618,7 @@
         });
 
         map.on('mouseup', e => {
-            if (e.originalEvent.button !== 2) return;
+            if (e.originalEvent.button !== 2 || !selecting) return;
             selecting = false;
 
             if (selection_origin_point.x == Math.round(e.originalEvent.clientX) &&
@@ -627,7 +626,6 @@
                 hideSelection();
             } else {
                 selected_box[1] = latlngToMercator(e.latlng);
-                console.log(selected_box);
                 showReport();
             }
         });
