@@ -204,7 +204,6 @@
         <span>Boeing vs. Airbus</span>
         <span>Helicopters</span>
         <span>Hi-Performance</span>
-        <span>Supersonic</span>
         <span>Light</span>
         <span>Gliders</span>
         <span>Ultralight</span>
@@ -286,12 +285,12 @@
 
             query_elem.blur();
             main_layer_sample100.redraw();
+            if (selected_box.length) showReport();
         }
 
         function setQuery(value) {
             query_elem.value = value;
             collapseQueryEditor();
-            if (selected_box.length) showReport();
         }
 
         for (elem of document.querySelectorAll('#examples span')) {
@@ -547,8 +546,10 @@
 
             calculateReport(sql_total).then(data => {
                 const row = data[0];
-                document.getElementById('report_total').textContent = `Total ${row.traces} traces, ${row.aircrafts} aircrafts of ${row.types} types, ${row.flights} flight nums.`;
-                document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
+                document.getElementById('report_total').textContent = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.flights).toLocaleString()} flight nums.`;
+                if (row.traces > 0) {
+                    document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
+                }
             });
 
             calculateReport(sql_flights).then(data => {
