@@ -576,7 +576,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
     255 * transparency AS alpha,
     255 * c_weekend * mostly_weekends AS red,
-    r / 2 AS green,
+    red / 2 AS green,
     255 * c_weekday * (NOT mostly_weekends) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
