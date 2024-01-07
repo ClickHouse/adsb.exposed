@@ -304,6 +304,9 @@
         let map_elem = document.getElementById('map');
         let selected_box = [];
 
+        /// Protect from race conditions.
+        let report_sequence_num = 0;
+
         /// Query editor
 
         function expandQueryEditor() {
@@ -453,6 +456,18 @@
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
 
         /// Restore from a saved link
+
+        function latlngToMercator(latlng) {
+            return {
+                x: Math.round(0xFFFFFFFF * ((latlng.lng + 180) / 360)),
+                y: Math.round(0xFFFFFFFF * (1/2 - Math.log(Math.tan((latlng.lat + 90) / 360 * Math.PI)) / 2 / Math.PI)),
+                lat: latlng.lat,
+                lng: latlng.lng
+            };
+        }
+
+        let initial_load = true;
+
         if (window.location.search) {
             const params = new URLSearchParams(window.location.search);
             const hash = params.get('query');
@@ -468,9 +483,12 @@
             const box = params.get('box');
             if (box) {
                 const arr = box.split(',');
-                selected_box = [{x: arr[0], y: arr[1]}, {x: arr[2], y: arr[3]}];
+                selected_box = [latlngToMercator({lat: +arr[0], lng: +arr[1]}), latlngToMercator({lat: +arr[2], lng: +arr[3]})];
+                showReport();
             }
         }
+
+        /// Sequential loading for different levels of details
 
         main_layer_sample100.addTo(map);
 
@@ -521,23 +539,13 @@
             }
         });
 
-        let selection = document.getElementById('selection');
         let selecting = false;
         let selection_origin_point = {x: 0, y: 0};
-
-        function latlngToMercator(latlng) {
-            return {
-                x: Math.round(0xFFFFFFFF * ((latlng.lng + 180) / 360)),
-                y: Math.round(0xFFFFFFFF * (1/2 - Math.log(Math.tan((latlng.lat + 90) / 360 * Math.PI)) / 2 / Math.PI))
-            };
-        }
+        let selection = document.getElementById('selection');
 
         function clearContainer(elem) {
             while (elem.firstChild) elem.removeChild(elem.firstChild);
         }
-
-        /// Protect from race conditions.
-        let report_sequence_num = 0;
 
         function showReport() {
             ++report_sequence_num;
@@ -888,7 +896,9 @@
             };
 
             let search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
-            if (selected_box.length == 2) search += `&box=${selected_box[0].x},${selected_box[0].y},${selected_box[1].x},${selected_box[1].y}`;
+            if (selected_box.length == 2) {
+                search += `&box=${selected_box[0].lat.toFixed(4)},${selected_box[0].lng.toFixed(4)},${selected_box[1].lat.toFixed(4)},${selected_box[1].lng.toFixed(4)}`;
+            }
             history.replaceState(state, '', search);
         }
 
@@ -897,14 +907,33 @@
             if (!state) return;
             query_elem.value = state.query;
             map.setView(state.center, state.zoom);
-            if (state.selected_box.length == 2) {
-                selected_box = state.selected_box;
+            if (state.box.length == 2) {
+                selected_box = state.box;
                 showReport();
             }
         };
 
-        map.on('movestart', e => hideSelection());
-        map.on('moveend', e => updateHistory());
+        map.on('movestart', e => {
+            selection.style.display = 'none';
+        });
+        map.on('moveend', e => {
+            if (!initial_load) {
+                updateHistory();
+            } else {
+                initial_load = false;
+            }
+
+            if (selected_box) {
+                const point0 = map.latLngToContainerPoint([selected_box[0].lat, selected_box[0].lng]);
+                const point1 = map.latLngToContainerPoint([selected_box[1].lat, selected_box[1].lng]);
+
+                selection.style.display = 'block';
+                selection.style.left = point0.x + 'px';
+                selection.style.top = point0.y + 'px';
+                selection.style.width = (point1.x - point0.x) + 'px';
+                selection.style.height = (point1.y - point0.y) + 'px';
+            }
+        });
     </script>
 </body>
 </html>
