@@ -169,6 +169,16 @@
             font-weight: bold;
         }
 
+        #picture {
+            position: absolute;
+            left: 1em;
+            bottom: 4em;
+            font-size: 16pt;
+            z-index: 1001;
+            display: none;
+            box-shadow: 2px 2px 10px rgba(0,0,0,1);
+        }
+
         #layers, #provider, #select {
             position: absolute;
             padding: .3em .5em .2em .5em;
@@ -269,6 +279,7 @@
         <div id="report_owners"></div>
         <div id="report_regs"></div>
     </div>
+    <img id="picture"/>
     <div id="error"></div>
     <div id="layers">👁</div>
     <div id="select"><img src="pointer.svg"/></div>
@@ -638,6 +649,50 @@
                 return json;
             }
 
+            async function findPicture(name) {
+                const wiki_api_url = 'https://en.wikipedia.org/w/api.php';
+
+                const search_url = wiki_api_url + '?' + new URLSearchParams({
+                    action: 'query',
+                    list: 'search',
+                    srsearch: name,
+                    format: 'json',
+                    origin: '*'
+                });
+
+                const response = await fetch(search_url);
+                const search_data = await response.json();
+
+                if (search_data.query && search_data.query.search && search_data.query.search.length > 0) {
+                    const title = search_data.query.search[0].title;
+
+                    const page_url = wiki_api_url + '?' + new URLSearchParams({
+                        action: 'query',
+                        titles: title,
+                        prop: 'pageimages',
+                        format: 'json',
+                        origin: '*'
+                    });
+
+                    const response = await fetch(page_url);
+                    const pages_data = await response.json();
+
+                    const pages = pages_data.query.pages;
+                    const page_id = Object.keys(pages)[0];
+                    if (pages[page_id].thumbnail) {
+                        return pages[page_id].thumbnail.source.replace('50px', '500px');
+                    }
+                }
+            }
+
+            let cached_pictures = {};
+            async function findPictureCached(name) {
+                if (cached_pictures[name]) return cached_pictures[name];
+                const result = await findPicture(name);
+                cached_pictures[name] = result;
+                return result;
+            }
+
             function createList(sql, field, elem_id, title, separator, link_content_func) {
                 calculateReport(sql).then(json => {
                     if (current_report_sequence_num != report_sequence_num) return;
@@ -660,6 +715,25 @@
 
                             setQuery(changed_query);
                         });
+
+                        /// Pictures from Wikipedia
+                        if (field == 't') {
+                            link.addEventListener('mouseover', e => {
+                                findPictureCached(row.desc).then(url => {
+                                    if (url) {
+                                        let picture = document.getElementById('picture');
+                                        picture.style.display = 'block';
+                                        picture.src = url;
+                                    }
+                                });
+                            });
+                            link.addEventListener('mouseout', e => {
+                                let picture = document.getElementById('picture');
+                                picture.style.display = 'none';
+                                picture.src = '';
+                            });
+                        }
+
                         elem.appendChild(link);
                     }
                     if (json.data.length >= 100) elem.appendChild(document.createTextNode('…'));
