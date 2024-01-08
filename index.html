@@ -742,7 +742,14 @@
 
             calculateReport(sql_total).then(json => {
                 const row = json.data[0];
-                document.getElementById('report_total').textContent = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.aircrafts).toLocaleString()} flight nums. Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+
+                let text = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.aircrafts).toLocaleString()} flight nums.`;
+
+                if (json.statistics.rows_read > 1) {
+                    text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                }
+
+                document.getElementById('report_total').textContent = text;
 
                 if (row.traces > 0) {
                     document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
@@ -759,6 +766,9 @@
             selected_box = [];
             document.getElementById('report').style.display = 'none';
             document.documentElement.style.setProperty('--report-width', '0%');
+            let picture = document.getElementById('picture');
+            picture.style.display = 'none';
+            picture.src = '';
         }
 
         function hideSelection() {
