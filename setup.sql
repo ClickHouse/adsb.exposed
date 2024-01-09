@@ -91,6 +91,7 @@ SETTINGS
     use_query_cache = 1,
     query_cache_ttl = 8640000,
     query_cache_share_between_users = 1,
+    analyze_index_with_space_filling_curves = 0,
     priority CHANGEABLE_IN_READONLY,
     readonly = 1;
 
