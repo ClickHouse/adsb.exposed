@@ -378,13 +378,15 @@
         /// Rendering
 
         let show_progress_bar = false;
+        let query_sequence_num = 0;
 
         async function render(table, priority, coords, tile) {
             const sql = query_elem.value;
             const key = `${sql}-${table}-${coords.z}-${coords.x}-${coords.y}`;
             let buf = cached_tiles[key];
             if (!buf) {
-                const query_id = `${uuid}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
+                ++query_sequence_num;
+                const query_id = `${uuid}-${query_sequence_num}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
                 const host = getHost();
                 const url = `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
