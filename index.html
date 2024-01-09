@@ -382,8 +382,15 @@
 
         async function render(table, priority, coords, tile) {
             const sql = query_elem.value;
-            const key = `${sql}-${table}-${coords.z}-${coords.x}-${coords.y}`;
-            let buf = cached_tiles[key];
+            const key = `${sql}-${coords.z}-${coords.x}-${coords.y}`;
+
+            if (!cached_tiles[key]) cached_tiles[key] = [];
+
+            /// If there is a higer-detail tile, skip rendering of this level of detal.
+            if (cached_tiles[key][priority + 1]) return;
+
+            buf = cached_tiles[key][priority];
+
             if (!buf) {
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
@@ -407,7 +414,7 @@
                 }
 
                 buf = await response.arrayBuffer();
-                cached_tiles[key] = buf;
+                cached_tiles[key][priority] = buf;
             }
 
             let ctx = tile.getContext('2d');
@@ -1009,7 +1016,7 @@
                 initial_load = false;
             }
 
-            if (selected_box) {
+            if (selected_box && selected_box.length == 2) {
                 const point0 = map.latLngToContainerPoint([selected_box[0].lat, selected_box[0].lng]);
                 const point1 = map.latLngToContainerPoint([selected_box[1].lat, selected_box[1].lng]);
 
