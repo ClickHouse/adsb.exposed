@@ -314,6 +314,7 @@
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
         let selected_box = [];
+        let cached_tiles = {};
 
         /// Protect from race conditions.
         let report_sequence_num = 0;
@@ -428,8 +429,6 @@
             let err = document.getElementById('error');
             err.style.display = 'none';
         }
-
-        let cached_tiles = {};
 
         L.GridLayer.ClickHouse = L.GridLayer.extend({
             createTile: function(coords, done) {
