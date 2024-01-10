@@ -18,7 +18,7 @@ let queries = {
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -58,10 +58,10 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     sum(desc LIKE 'AIRBUS%') AS airbus,
     sum(NOT (desc LIKE 'BOEING%' OR desc LIKE 'AIRBUS%')) AS other,
 
-    greatest(1000000 DIV zoom_factor, total) AS max_total,
-    greatest(1000000 DIV zoom_factor, boeing) AS max_boeing,
-    greatest(1000000 DIV zoom_factor, airbus) AS max_airbus,
-    greatest(1000000 DIV zoom_factor, other) AS max_other,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, total) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, boeing) AS max_boeing,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, airbus) AS max_airbus,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, other) AS max_other,
 
     pow(total / max_total, 1/5) AS transparency,
 
@@ -94,7 +94,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 500)) / 500 AS color1,
@@ -130,7 +130,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, total) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, total) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
 
@@ -164,7 +164,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, total) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, total) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
@@ -255,7 +255,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, total) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, total) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
 
@@ -288,7 +288,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -355,7 +355,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 50000)) / 50000 AS color1,
@@ -390,7 +390,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -461,7 +461,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -496,7 +496,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -565,7 +565,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     toDayOfWeek(date + INTERVAL lon / 15 HOUR) > 5 AS weekend,
@@ -634,7 +634,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -670,7 +670,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
 
     pow(total / max_total, 1/5) AS transparency,
     greatest(0, least(avg(altitude), 5000)) / 5000 AS color1,
@@ -738,7 +738,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(altitude), 10000)) / 10000 AS color1,
@@ -773,7 +773,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(1000 DIV zoom_factor, count()) AS max_total,
+    greatest(1000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     greatest(0, least(avg(ground_speed), 50)) / 50 AS color,
@@ -807,7 +807,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() AS total,
-    greatest(100000 DIV zoom_factor, count()) AS max_total,
+    greatest(100000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
     pow(total / max_total, 1/5) AS transparency,
 
     cityHash64(substring(aircraft_flight, 1, 3)) AS hash,
@@ -819,6 +819,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
-WHERE in_tile AND aircraft_flight != '' -- AND aircraft_category = 'A3'
+WHERE in_tile AND aircraft_flight != ''
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 };

@@ -398,7 +398,7 @@
                 const host = getHost();
                 const url = `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
-                    `&param_table=${table}` +
+                    `&param_table=${table}&param_sampling=${[0, 100, 10, 1][priority]}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
                 progress_update_period = 1;
