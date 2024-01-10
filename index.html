@@ -378,7 +378,7 @@
 
         /// Rendering
 
-        let show_progress_bar = false;
+        let progress_update_period = null;
         let query_sequence_num = 0;
 
         async function render(table, priority, coords, tile) {
@@ -401,7 +401,7 @@
                     `&param_table=${table}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
-                show_progress_bar = true;
+                progress_update_period = 1;
                 const response = await fetch(url, { method: 'POST', body: sql });
 
                 if (!response.ok) {
@@ -838,9 +838,16 @@
 
         /// Progress bar
 
-        let active_stat_queries = 0;
+        const progress_min_interval = 100;
+        let progress_update_counter = 0;
+        let previous_progress_update = 0;
+
         async function getStats() {
-            if (!show_progress_bar || active_stat_queries > 0) return;
+            ++progress_update_counter;
+            if (!progress_update_period || (progress_update_counter - previous_progress_update) < progress_update_period) {
+                setTimeout(getStats, progress_min_interval);
+                return;
+            }
 
             const sql = `SELECT
                     sum(read_rows) AS r,
@@ -858,14 +865,8 @@
             const host = getHost();
             const url = `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
 
-            ++active_stat_queries;
-            let response;
-            let data;
-            try {
-                response = await fetch(url, { method: 'POST', body: sql });
-                data = await response.json();
-            } catch (e) {}
-            --active_stat_queries;
+            let response = await fetch(url, { method: 'POST', body: sql });
+            let data = await response.json();
 
             const stat = data.data[0];
 
@@ -877,12 +878,17 @@
                 if (stat.rps > 100e6) text += ` (${stat.formatted_rps}/sec, ${stat.formatted_bps}/sec)`;
 
                 document.getElementById('stats').textContent = text;
+                progress_update_period = 1;
             } else {
                 document.documentElement.style.setProperty('--progress', '0');
+                progress_update_period *= 2;
             }
+
+            previous_progress_update = progress_update_counter;
+            setTimeout(getStats, progress_min_interval);
         }
 
-        setInterval(getStats, 100);
+        setTimeout(getStats, progress_min_interval);
 
         /// Saved queries
 
