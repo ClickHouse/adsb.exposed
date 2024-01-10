@@ -18,7 +18,7 @@
             --progress-foreground-color3: #088;
 
             --progress-background-color4: #333;
-            --progress-foreground-color4: #333;
+            --progress-foreground-color4: #666;
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
@@ -632,15 +632,17 @@
                 ORDER BY c DESC
                 LIMIT 100`;
 
-            async function calculateReport(sql) {
+            async function calculateReport(sql, field) {
+                const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const host = getHost();
-                const url = `${host}/?user=website&default_format=JSON` +
+                const url = `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
                     `&param_table=planes_mercator` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
                     `&param_top=${Math.min(selected_box[0].y, selected_box[1].y)}` +
                     `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
 
+                progress_update_period = 1;
                 const response = await fetch(url, { method: 'POST', body: sql });
 
                 if (!response.ok) {
@@ -702,7 +704,7 @@
             }
 
             function createList(sql, field, elem_id, title, separator, link_content_func) {
-                calculateReport(sql).then(json => {
+                calculateReport(sql, field).then(json => {
                     if (current_report_sequence_num != report_sequence_num) return;
 
                     let elem = document.getElementById(elem_id);
