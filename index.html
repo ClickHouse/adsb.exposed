@@ -335,8 +335,6 @@
 
             query_elem.blur();
             main_layer_sample100.redraw();
-            main_layer_sample10.redraw();
-            main_layer_full.redraw();
             if (selected_box.length == 2) showReport();
         }
 
@@ -376,8 +374,6 @@
         document.querySelector('form').addEventListener('change', e => {
             cached_tiles = {};
             main_layer_sample100.redraw();
-            main_layer_sample10.redraw();
-            main_layer_full.redraw();
         });
 
         /// Rendering
@@ -473,7 +469,6 @@
         let map = L.map('map', {
             center: [52.3676, 4.9041],
             zoom: 5,
-            worldCopyJump: true,
             layers: [base_layer]
         });
 
@@ -515,31 +510,30 @@
         /// Sequential loading for different levels of details
 
         main_layer_sample100.addTo(map);
-        main_layer_sample10.addTo(map);
-        main_layer_full.addTo(map);
 
         main_layer_sample100.on('load', e => {
-            //main_layer_sample10.addTo(map);
+            main_layer_sample10.addTo(map);
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color2)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color2)');
             updateHistory();
         });
 
         main_layer_sample10.on('load', e => {
-            //main_layer_full.addTo(map);
+            main_layer_full.addTo(map);
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color3)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color3)');
         });
 
         main_layer_full.on('load', e => {
+            show_progress_bar = false;
             document.documentElement.style.setProperty('--progress', '0');
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
         });
 
         main_layer_sample100.on('loading', e => {
-            //main_layer_full.removeFrom(map);
-            //main_layer_sample10.removeFrom(map);
+            main_layer_full.removeFrom(map);
+            main_layer_sample10.removeFrom(map);
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
         });
