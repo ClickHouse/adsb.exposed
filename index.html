@@ -469,6 +469,7 @@
         let map = L.map('map', {
             center: [52.3676, 4.9041],
             zoom: 5,
+            worldCopyJump: true,
             layers: [base_layer]
         });
 
@@ -525,7 +526,6 @@
         });
 
         main_layer_full.on('load', e => {
-            show_progress_bar = false;
             document.documentElement.style.setProperty('--progress', '0');
             document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
             document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
