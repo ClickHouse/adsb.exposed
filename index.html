@@ -364,11 +364,20 @@
             }
         });
 
-        function getHost() {
+        function getHost(stick) {
             const provider = document.querySelector('input[name="provider"]:checked').value;
-            return provider == 'self-hosted' ?
-                'https://fly-selfhosted-backend.clickhouse.com' :
-                'https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com';
+
+            if (provider == 'self-hosted') {
+                return 'https://fly-selfhosted-backend.clickhouse.com';
+            } else {
+                let suffix = '';
+                if (stick) {
+                    const num_buckets = 100n;
+                    const bucket = Number(BigInt('0x' + sipHash128(JSON.stringify(stick))) % num_buckets);
+                    suffix = `-${bucket}`;
+                }
+                return `https://kvzqttvc2n${suffix}.eu-west-1.aws.clickhouse-staging.com`;
+            }
         }
 
         document.querySelector('form').addEventListener('change', e => {
@@ -395,7 +404,7 @@
             if (!buf) {
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
-                const host = getHost();
+                const host = getHost(key);
                 const url = `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
                     `&param_table=${table}&param_sampling=${[0, 100, 10, 1][priority]}` +
@@ -634,7 +643,7 @@
 
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
-                const host = getHost();
+                const host = getHost([field, selected_box, sql]);
                 const url = `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
                     `&param_table=planes_mercator` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
@@ -864,7 +873,7 @@
                 FROM clusterAllReplicas(default, system.processes)
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
-            const host = getHost();
+            const host = getHost(uuid);
             const url = `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
 
             let response = await fetch(url, { method: 'POST', body: sql });
@@ -953,14 +962,14 @@
 
         async function saveQuery(text) {
             const sql = `INSERT INTO saved_queries (text) FORMAT RawBLOB`;
-            const host = getHost();
+            const host = getHost(null);
             const url = `${host}/?user=website_saved_queries&query=${encodeURIComponent(sql)}`;
             const response = await fetch(url, { method: 'POST', body: text });
         }
 
         async function loadQuery(hash) {
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
-            const host = getHost();
+            const host = getHost(null);
             const url = `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
             const response = await fetch(url, { method: 'POST', body: sql });
             const data = await response.json();
