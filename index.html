@@ -370,13 +370,12 @@
             if (provider == 'self-hosted') {
                 return 'https://fly-selfhosted-backend.clickhouse.com';
             } else {
-                let suffix = '';
+                let prefix = '';
                 if (stick) {
-                    const num_buckets = 100n;
-                    const bucket = Number(BigInt('0x' + sipHash128(JSON.stringify(stick))) % num_buckets);
-                    suffix = `-${bucket}`;
+                    const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
+                    prefix = `${hash}.`;
                 }
-                return `https://kvzqttvc2n${suffix}.eu-west-1.aws.clickhouse-staging.com`;
+                return `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
             }
         }
 
