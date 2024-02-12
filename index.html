@@ -224,7 +224,7 @@
         #provider {
             left: 7em;
             bottom: 1em;
-            height: 2em;
+            height: 3em;
             padding: 0.1em .3em 0.1em 0.3em;
             font-size: 16pt;
         }
@@ -287,13 +287,18 @@
     <div id="provider">
         <form>
             <label>
-                <input type="radio" name="provider" value="self-hosted" checked>
-                Self-hosted
+                <input type="radio" name="provider" value="cloud">
+                Cloud
             </label>
             <br/>
             <label>
-                <input type="radio" name="provider" value="cloud">
-                Cloud
+                <input type="radio" name="provider" value="self-hosted-intel" checked>
+                Self-hosted (Intel)
+            </label>
+            <br/>
+            <label>
+                <input type="radio" name="provider" value="self-hosted-graviton">
+                Self-hosted (Graviton)
             </label>
         </form>
     </div>
@@ -367,8 +372,10 @@
         function getHost(stick) {
             const provider = document.querySelector('input[name="provider"]:checked').value;
 
-            if (provider == 'self-hosted') {
+            if (provider == 'self-hosted-intel') {
                 return 'https://fly-selfhosted-backend.clickhouse.com';
+            } if (provider == 'self-hosted-graviton') {
+                return 'https://fly-selfhosted-backend-2.clickhouse.com';
             } else {
                 let prefix = '';
                 if (stick) {
