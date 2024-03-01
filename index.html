@@ -380,7 +380,7 @@
                 let prefix = '';
                 if (stick) {
                     const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
-                    prefix = `${hash}.`;
+                    prefix = `${hash}.sticky.`;
                 }
                 return `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
             }
