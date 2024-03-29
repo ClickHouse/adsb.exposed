@@ -192,6 +192,11 @@
             background: rgba(255, 255, 255, 0.5);
         }
 
+        #picture-copyright a {
+            text-decoration: none;
+            color: #088;
+        }
+
         #layers, #provider, #select {
             position: absolute;
             padding: .3em .5em .2em .5em;
@@ -730,7 +735,23 @@
                     const pages = pages_data.query.pages;
                     const page_id = Object.keys(pages)[0];
                     if (pages[page_id].thumbnail) {
-                        return pages[page_id].thumbnail.source.replace('50px', '500px');
+
+                        const image_info_url = wiki_api_url + '?' + new URLSearchParams({
+                            action: 'query',
+                            titles: 'File:' + pages[page_id].pageimage,
+                            prop: 'imageinfo',
+                            iiprop: 'extmetadata',
+                            format: 'json',
+                            origin: '*'
+                        });
+
+                        const image_info_response = await fetch(image_info_url);
+                        const image_info_data = await image_info_response.json();
+
+                        const metadata = image_info_data.query.pages["-1"].imageinfo[0].extmetadata;
+                        const attribution = `${metadata.LicenseShortName.value}, ${metadata.Artist.value}`;
+
+                        return {src: pages[page_id].thumbnail.source.replace('50px', '500px'), attr: attribution};
                     }
                 }
             }
@@ -769,11 +790,12 @@
                         /// Pictures from Wikipedia
                         if (field == 't') {
                             link.addEventListener('mouseover', e => {
-                                findPictureCached(row.desc).then(url => {
-                                    if (url) {
+                                findPictureCached(row.desc).then(data => {
+                                    if (data) {
                                         let picture = document.getElementById('picture');
                                         picture.style.display = 'block';
-                                        picture.firstChild.src = url;
+                                        picture.firstChild.src = data.src;
+                                        document.getElementById('picture-copyright').innerHTML = data.attr;
                                     }
                                 });
                             });
