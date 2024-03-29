@@ -795,7 +795,10 @@
                                         let picture = document.getElementById('picture');
                                         picture.style.display = 'block';
                                         picture.firstChild.src = data.src;
-                                        document.getElementById('picture-copyright').innerHTML = data.attr;
+                                        let copyright = document.getElementById('picture-copyright');
+                                        copyright.innerHTML = data.attr;
+                                        /// Sometimes there are tables, paragraphs, etc. Strip them.
+                                        copyright.innerHTML = copyright.innerText;
                                     }
                                 });
                             });
