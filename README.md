@@ -1,6 +1,6 @@
 # ADS-B Massive Visualizer
 
-This website (technology demo) allows you to aggregate and visualize massive amounts of air traffic data. The data is hosted in a ClickHouse database and queried on the fly. You can tune the visualizations with custom SQL queries and drill-down from 50 billion records to individual data records.
+This website (technology demo) allows you to aggregate and visualize massive amounts of air traffic data. The data is hosted in a [ClickHouse](https://github.com/ClickHouse/ClickHouse/) database and queried on the fly. You can tune the visualizations with custom SQL queries and drill-down from 50 billion records to individual data records.
 
 ## Examples
 
