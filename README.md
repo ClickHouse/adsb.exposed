@@ -117,7 +117,7 @@ In Dubai Airport, the green hairball is a hangar of Emirates Engineering where A
 ### [Patroling in Israel:](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
 
 In Israel, there are strange patterns made by patrolling drones:
-[![Patroling in Israel](pictures/israel.png)](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
+[![Patroling in Israel](pictures/israel_patrol.png)](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
 
 ### [Namibia air club:](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=377.9942&query=dd3c1af70baafa35055b06fa3556d96e)
 
