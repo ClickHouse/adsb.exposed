@@ -177,6 +177,19 @@
             z-index: 1001;
             display: none;
             box-shadow: 2px 2px 10px rgba(0,0,0,1);
+            line-height: 0;
+            min-width: 500px;
+            min-height: 1em;
+        }
+
+        #picture-copyright {
+            position: absolute;
+            left: 0;
+            bottom: 0;
+            font-family: sans-serif;
+            font-size: 12pt;
+            line-height: 1;
+            background: rgba(255, 255, 255, 0.5);
         }
 
         #layers, #provider, #select {
@@ -222,6 +235,7 @@
         }
 
         #provider {
+            display: none;
             left: 7em;
             bottom: 1em;
             height: 4em;
@@ -279,7 +293,7 @@
         <div id="report_owners"></div>
         <div id="report_regs"></div>
     </div>
-    <img id="picture"/>
+    <div id="picture"><img/><span id="picture-copyright">Picture from Wikipedia, &copy; the details at the corresponding page.</span></div>
     <div id="error"></div>
     <div id="layers">👁</div>
     <div id="select"><img src="pointer.svg"/></div>
@@ -759,14 +773,14 @@
                                     if (url) {
                                         let picture = document.getElementById('picture');
                                         picture.style.display = 'block';
-                                        picture.src = url;
+                                        picture.firstChild.src = url;
                                     }
                                 });
                             });
                             link.addEventListener('mouseout', e => {
                                 let picture = document.getElementById('picture');
                                 picture.style.display = 'none';
-                                picture.src = '';
+                                picture.firstChild.src = '';
                             });
                         }
 
@@ -804,7 +818,7 @@
             document.documentElement.style.setProperty('--report-width', '0%');
             let picture = document.getElementById('picture');
             picture.style.display = 'none';
-            picture.src = '';
+            picture.firstChild.src = '';
         }
 
         function hideSelection() {
