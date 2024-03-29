@@ -224,7 +224,7 @@
         #provider {
             left: 7em;
             bottom: 1em;
-            height: 3em;
+            height: 4em;
             padding: 0.1em .3em 0.1em 0.3em;
             font-size: 16pt;
         }
@@ -287,12 +287,17 @@
     <div id="provider">
         <form>
             <label>
+                <input type="radio" name="provider" value="race" checked>
+                Race
+            </label>
+            <br/>
+            <label>
                 <input type="radio" name="provider" value="cloud">
                 Cloud
             </label>
             <br/>
             <label>
-                <input type="radio" name="provider" value="self-hosted-intel" checked>
+                <input type="radio" name="provider" value="self-hosted-intel">
                 Self-hosted (Intel)
             </label>
             <br/>
@@ -369,20 +374,26 @@
             }
         });
 
-        function getHost(stick) {
+        function getHosts(stick) {
             const provider = document.querySelector('input[name="provider"]:checked').value;
 
             if (provider == 'self-hosted-intel') {
-                return 'https://fly-selfhosted-backend.clickhouse.com';
-            } if (provider == 'self-hosted-graviton') {
-                return 'https://fly-selfhosted-backend-2.clickhouse.com';
+                return ['https://fly-selfhosted-backend.clickhouse.com'];
+            } else if (provider == 'self-hosted-graviton') {
+                return ['https://fly-selfhosted-backend-2.clickhouse.com'];
             } else {
                 let prefix = '';
                 if (stick) {
                     const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
                     prefix = `${hash}.sticky.`;
                 }
-                return `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
+                const cloud_host = `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
+
+                if (provider == 'cloud') {
+                    return [cloud_host];
+                } else {
+                    return [cloud_host, 'https://fly-selfhosted-backend.clickhouse.com'];
+                }
             }
         }
 
@@ -410,14 +421,14 @@
             if (!buf) {
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
-                const host = getHost(key);
-                const url = `${host}/?user=website&default_format=RowBinary` +
+                const hosts = getHosts(key);
+                const url = host => `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
                     `&param_table=${table}&param_sampling=${[0, 100, 10, 1][priority]}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
                 progress_update_period = 1;
-                const response = await fetch(url, { method: 'POST', body: sql });
+                const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -649,8 +660,8 @@
 
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
-                const host = getHost([field, selected_box, sql]);
-                const url = `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
+                const hosts = getHosts([field, selected_box, sql]);
+                const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
                     `&param_table=planes_mercator` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
@@ -658,7 +669,7 @@
                     `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
 
                 progress_update_period = 1;
-                const response = await fetch(url, { method: 'POST', body: sql });
+                const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -879,15 +890,16 @@
                 FROM clusterAllReplicas(default, system.processes)
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
-            const host = getHost(uuid);
-            const url = `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
+            const hosts = getHosts(uuid);
+            const url = host => `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
 
-            let response = await fetch(url, { method: 'POST', body: sql });
-            let data = await response.json();
+            let responses = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+            let datas = await Promise.all(responses.map(response => response.json()));
 
-            const stat = data.data[0];
+            /// Which of the hosts are processing our queries?
+            const stat = datas.map(d => d.data[0]).filter(d => d.t && d.t > 0).sort((a, b) => b.bps - a.bps)[0];
 
-            if (stat.t && stat.t > 0) {
+            if (stat) {
                 document.documentElement.style.setProperty('--progress', (100 * stat.r / stat.t) + '%');
 
                 let text = '';
@@ -968,16 +980,16 @@
 
         async function saveQuery(text) {
             const sql = `INSERT INTO saved_queries (text) FORMAT RawBLOB`;
-            const host = getHost(null);
-            const url = `${host}/?user=website_saved_queries&query=${encodeURIComponent(sql)}`;
-            const response = await fetch(url, { method: 'POST', body: text });
+            const hosts = getHosts(null);
+            const url = host => `${host}/?user=website_saved_queries&query=${encodeURIComponent(sql)}`;
+            const response = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: text })));
         }
 
         async function loadQuery(hash) {
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
-            const host = getHost(null);
-            const url = `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
-            const response = await fetch(url, { method: 'POST', body: sql });
+            const host = getHosts(null);
+            const url = host => `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
+            const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
             const data = await response.json();
             return data.data[0].text;
         }
