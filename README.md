@@ -1,6 +1,6 @@
 # ADS-B Massive Visualizer
 
-This website allows you to aggregate and visualize massive amounts of air traffic data. The data is hosted in a ClickHouse database and queried on the fly. You can tune the visualizations with custom SQL queries and drill-down from 40 billion records down to individual data records.
+This website allows you to aggregate and visualize massive amounts of air traffic data. The data is hosted in a ClickHouse database and queried on the fly. You can tune the visualizations with custom SQL queries and drill-down from 50 billion records down to individual data records.
 
 ## Examples
 
@@ -173,4 +173,64 @@ But DC-3 is unanimously the best:
 
 ## Data Source
 
-ADS-B is a radio protocol
+ADS-B (Automatic Dependent Surveillance–Broadcast) is a radio protocol that is used to broadcast the data such as coordinates, altitude and velocity, and plenty of other interesting data. It is broadcast by "transponders" installed on airplanes (and not only planes). This protocol is unencrypted and there is no restrictions for collecting, using, or redistributing this data. Most of passenger airplanes are obligated to broadcast this data, and in certain countries even gliders, drones, and airport ground vehicles. Military and private light aircrafts might broadcast or not broadcast the data.
+
+It is possible to collect this data out of thin air using your own radio receiver (e.g. in the form of SDR), although your receiver will see the data only in a certain range of your location. There are platforms for sharing and exchange of this data. Some of these platforms invite participants to share the data but restrict its redistribution by providing a commercial access to it. While the source data, broadcast by airplanes is essentially public domain, the companies may produce and license derivative works from this data.
+
+We use the data from two sources: [ADSB.lol](https://www.adsb.lol/) (full historical data is provided without restrictions: 30..50 million records per day, available since 2023) and [ADSB-Exchange](https://www.adsbexchange.com/products/historical-data/) (only provides samples of data from first day of each month: around 1.2 billion records per day with better coverage).
+
+
+## References
+
+### Similar Projects
+
+Similar projects track back to 2007. Analysis and visualization of the air traffic and geospatial data is easy and accessible (assuming you use ClickHouse).
+
+#### [Flight Patterns](https://www.aaronkoblin.com/work/flightpatterns/) by Aaron Koblin (2007)
+
+#### [Airspace Rebooted](https://vimeo.com/11205494) by ItoWorld and Hal Bertram (2010)
+
+#### [Europe 24 – an air traffic data visualisation](https://nats.aero/blog/2014/03/europe-24-air-traffic-data-visualisation/) by nats.aero (2014)
+
+#### [Strava Global Heatmap](https://www.strava.com/maps/global-heatmap) (2014)
+
+Also, read the [blog post](https://medium.com/strava-engineering/the-global-heatmap-now-6x-hotter-23fc01d301de) about rebuilding this heatmap (2017).
+
+#### [Connected World: Untangling the Air Traffic Network](https://www.martingrandjean.ch/connected-world-air-traffic-network/) by Martin Grandjean (2016)
+
+#### [Highways In The Skies](https://tjukanov.org/highways-in-the-skies) by Topi Tjukanov (2018)
+
+#### [Flight Data Visualization](https://mapsmith.net/2018/06/16/flight-data-visualization/) by Stephen (2018)
+
+#### Carto.com: [BigQuery Tiler](https://carto.com/bigquery-tiler/) (2021)
+
+Due to the limitations of underlying technology (BigQuery instead of ClickHouse) the service works slow and each query comes with a big cost.
+
+#### [One Day of Global Air Traffic](https://cbergillos.com/blog/2022-11-11-24h-global-air-traffic/) by Carlos Bergillos (2022)
+
+This project is very similar to mine, but I found it late. It uses pregenerated tiles instead of generating them on the fly. The author probably didn't know about ClickHouse. This limits it to just a single visualization.
+
+#### Heavy.AI: [Ships Tracking](https://www.heavy.ai/demos/ships) (2022)
+
+This is a demo from another database vendor. They use a smaller dataset (AIS data for ships tracking) but the demo is slow.
+
+#### [Mapping the World’s Flight Paths with Python](https://towardsdatascience.com/mapping-the-worlds-flight-paths-with-python-232b9f7271e5) by Adam Symington (2023)
+
+#### [Global Flight Tracking](https://tech.marksblogg.com/global-flight-tracking-adsb.html) by Mark Litwintschik (2023)
+
+This blog post shows how to analyze a single day of data using a Python script. The technology stack used in the article is not powerful enough to analyze the full dataset on the fly, which is possible with ClickHouse.
+
+
+
+### List Of Exchanges
+
+- adsb.lol
+- adsb.fi
+- adsb.im
+- adsb.one
+- asdbhub.org
+- adsbexchange.com
+- flightaware.com
+- flightradar24.com
+- opensky-network.org
+- openflights.org
