@@ -126,8 +126,8 @@ In Namibia, there is a nice air club:
 
 Near Toulouse, France, Airbus A-380 does its test flights:
 
-### [A-380 in Touluse:](https://adsb.exposed/?zoom=8&lat=44.4260&lng=359.5055&query=86f1300b002f59fdabd60da7ffb116b3)
-[![A-380 in Touluse](pictures/a380.png)](https://adsb.exposed/?zoom=8&lat=44.4260&lng=359.5055&query=86f1300b002f59fdabd60da7ffb116b3)
+### [A-380 in Toulouse:](https://adsb.exposed/?zoom=8&lat=44.4260&lng=359.5055&query=86f1300b002f59fdabd60da7ffb116b3)
+[![A-380 in Toulouse](pictures/a380_toulouse.png)](https://adsb.exposed/?zoom=8&lat=44.4260&lng=359.5055&query=86f1300b002f59fdabd60da7ffb116b3)
 
 ### [Cognac Air Base:](https://adsb.exposed/?zoom=8&lat=45.7907&lng=359.7197&query=64acf6eb47ad04237460ef46873f3bc3)
 [![Cognac Air Base](pictures/cognac.png)](https://adsb.exposed/?zoom=8&lat=45.7907&lng=359.7197&query=64acf6eb47ad04237460ef46873f3bc3)
