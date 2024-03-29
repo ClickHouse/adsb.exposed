@@ -109,19 +109,19 @@ Balloons and Dirigibles are nice.
 [![Zeppelin in LA](pictures/zeppelin_la.png)](https://adsb.exposed/?zoom=9&lat=33.7335&lng=242.2996&query=d802a21e0db720c55aabe9d5f7503f06)
 
 
-In Dubai Airport, the green direct will be a hangar of Emirates Engineering where Airbuses are maintained:
-
 ### [Emirates Engineering:](https://adsb.exposed/?zoom=15&lat=25.2518&lng=415.3630&query=b4659aba93f0e495ef2aa837ee793874)
+
+In Dubai Airport, the green direct will be a hangar of Emirates Engineering where Airbuses are maintained:
 [![Emirates Engineering](pictures/emirates.png)](https://adsb.exposed/?zoom=15&lat=25.2518&lng=415.3630&query=b4659aba93f0e495ef2aa837ee793874)
 
-In Israel there are strange patterns made by patroling drones:
-
 ### [Patroling in Israel:](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
+
+In Israel there are strange patterns made by patroling drones:
 [![Patroling in Israel](pictures/israel.png)](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
 
-In Namibia there is a nice air club:
-
 ### [Namibia air club:](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=377.9942&query=dd3c1af70baafa35055b06fa3556d96e)
+
+In Namibia there is a nice air club:
 [![Namibia air club](pictures/namibia.png)](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=377.9942&query=dd3c1af70baafa35055b06fa3556d96e)
 
 Near Touluse, France, Airbus A-380 does its test flights:
@@ -147,20 +147,21 @@ By editing the SQL query you can color every airline with its own color.
 [![Airlines in Denver airport](pictures/denver_airlines.png)](https://adsb.exposed/?zoom=16&lat=39.8583&lng=255.3277&query=e9f7cdd454ff0473b47d750316976179)
 
 
-Analyzing a single airline we can see how the war affected the air traffic.
-
 ### [War:](https://adsb.exposed/?zoom=5&lat=53.5142&lng=18.8965&query=a3ad1397b4d525a5a6b329253635cda6)
+
+Analyzing a single airline we can see how the war affected the air traffic.
 [![War](pictures/war.png)](https://adsb.exposed/?zoom=5&lat=53.5142&lng=18.8965&query=a3ad1397b4d525a5a6b329253635cda6)
 
 
-There are interesting examples of single aircrafts:
-
 ### [Police:](https://adsb.exposed/?zoom=10&lat=45.4408&lng=237.4369&query=250e73f7f543ab8c92bd158ea65d666a)
+
+There are interesting examples of single aircrafts:
 [![Police](pictures/police.png)](https://adsb.exposed/?zoom=10&lat=45.4408&lng=237.4369&query=250e73f7f543ab8c92bd158ea65d666a)
 
-An-124 is a beautiful cargo plane, and you can find many of them in Leipzig:
 
 ### [An-124:](https://adsb.exposed/?zoom=5&lat=49.7263&lng=372.8327&query=34a85d5a6486168faa995976917d18f9)
+
+An-124 is a beautiful cargo plane, and you can find many of them in Leipzig:
 [![An-124](pictures/an124.png)](https://adsb.exposed/?zoom=5&lat=49.7263&lng=372.8327&query=34a85d5a6486168faa995976917d18f9)
 
 But DC-3 is unanimously the best:
