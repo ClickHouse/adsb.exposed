@@ -343,6 +343,8 @@ CREATE TABLE planes_mercator
 
 It contains `lat` and `lon` columns with coordinates, and we use `MATERIALIZED` columns to automatically convert them to coordinates in the [Web-Mercator projection](https://en.wikipedia.org/wiki/Web_Mercator_projection), which is used by the Leaflet software and most of the maps on the Internet. The Mercator coordinates are stored in UInt32 which makes it easy to do arithmetics with tile coordinates and zoom levels in a SQL query.
 
+The table is sorted by a [Morton Curve](https://clickhouse.com/docs/en/sql-reference/functions/encoding-functions#mortonencode) of Web Mercator coordinates, and we defined a [minmax index](https://clickhouse.com/docs/en/optimize/skipping-indexes) on them - this is how queries for certain tiles will read only the requested data.
+
 We create level-of-detail tables with [Materialized Views](https://clickhouse.com/docs/en/guides/developer/cascading-materialized-views), so they are calculated automatically:
 
 ```
