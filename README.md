@@ -74,17 +74,21 @@ F-16 military training:
 ### [F-16 training in Belgium:](https://adsb.exposed/?zoom=9&lat=51.3529&lng=365.6607&query=b8af6c7320f23c451d629cea6ae21826)
 [![F-16 training in Belgium](pictures/f16_belgium.png)](https://adsb.exposed/?zoom=9&lat=51.3529&lng=365.6607&query=b8af6c7320f23c451d629cea6ae21826)
 
-Kaliningrad:
-https://adsb.exposed/?zoom=7&lat=55.5040&lng=380.2597&query=dd3c1af70baafa35055b06fa3556d96e
 
-Polish air base:
-https://adsb.exposed/?zoom=11&lat=54.4764&lng=377.1181&query=dd3c1af70baafa35055b06fa3556d96e
+It is interesting to explore strange gaps in the map.
 
-Maroc air base:
-https://adsb.exposed/?zoom=8&lat=32.7553&lng=352.4367&query=dd3c1af70baafa35055b06fa3556d96e
+### [Guess what it is?](https://adsb.exposed/?zoom=7&lat=55.5040&lng=380.2597&query=dd3c1af70baafa35055b06fa3556d96e)
+[![Kaliningrad](pictures/kaliningrad.png)](https://adsb.exposed/?zoom=7&lat=55.5040&lng=380.2597&query=dd3c1af70baafa35055b06fa3556d96e)
 
-Popocatepetl: https://adsb.exposed/?zoom=9&lat=19.1139&lng=261.3813&query=dd3c1af70baafa35055b06fa3556d96e
-Canary: https://adsb.exposed/?zoom=8&lat=28.2122&lng=343.5701&query=dd3c1af70baafa35055b06fa3556d96e
+### [Polish air base:](https://adsb.exposed/?zoom=11&lat=54.4764&lng=377.1181&query=dd3c1af70baafa35055b06fa3556d96e)
+
+### [Maroc air base:](https://adsb.exposed/?zoom=8&lat=32.7553&lng=352.4367&query=dd3c1af70baafa35055b06fa3556d96e)
+
+### [A strange hole near Mexico City:](https://adsb.exposed/?zoom=9&lat=19.1139&lng=261.3813&query=dd3c1af70baafa35055b06fa3556d96e)
+[![Popocatepetl](pictures/popocatepetl.png)](https://adsb.exposed/?zoom=9&lat=19.1139&lng=261.3813&query=dd3c1af70baafa35055b06fa3556d96e)
+
+### [A volcano:](https://adsb.exposed/?zoom=8&lat=28.2122&lng=343.5701&query=dd3c1af70baafa35055b06fa3556d96e)
+[![Canary](pictures/canary.png)](https://adsb.exposed/?zoom=8&lat=28.2122&lng=343.5701&query=dd3c1af70baafa35055b06fa3556d96e)
 
 Emirates Engineering: https://adsb.exposed/?zoom=15&lat=25.2518&lng=415.3630&query=b4659aba93f0e495ef2aa837ee793874
 
