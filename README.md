@@ -5,7 +5,7 @@ This website allows you to aggregate and visualize massive amounts of air traffi
 ## Examples
 
 [Helicopters over Manhattan](https://adsb.exposed/?zoom=12&lat=40.7168&lng=285.9893&query=e18e8c8d6a1db73c63953798ad8919a9):
-!(Helicopters over Manhattan)(pictures/manhattan.png)
+[![Helicopters over Manhattan](pictures/manhattan.png)](https://adsb.exposed/?zoom=12&lat=40.7168&lng=285.9893&query=e18e8c8d6a1db73c63953798ad8919a9)
 
 Where the planes parked:
 https://adsb.exposed/?zoom=15&lat=39.8592&lng=255.3276&query=b4659aba93f0e495ef2aa837ee793874
