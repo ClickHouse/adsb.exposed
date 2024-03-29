@@ -138,9 +138,9 @@ Near Toulouse, France, Airbus A-380 does its test flights:
 ### [CFB Suffield:](https://adsb.exposed/?zoom=8&lat=50.4262&lng=249.4501&query=dd3c1af70baafa35055b06fa3556d96e)
 
 
-By editing the SQL query you can color every airline with its own color.
-
 ### [Airlines all over Europe:](https://adsb.exposed/?zoom=5&lat=51.0966&lng=10.3271&query=e9f7cdd454ff0473b47d750316976179)
+
+By editing the SQL query you can color every airline with its own color.
 [![Airlines all over Europe](pictures/eu_airlines.png)](https://adsb.exposed/?zoom=5&lat=51.0966&lng=10.3271&query=e9f7cdd454ff0473b47d750316976179)
 
 ### [Airlines in Denver airport:](https://adsb.exposed/?zoom=16&lat=39.8583&lng=255.3277&query=e9f7cdd454ff0473b47d750316976179)
