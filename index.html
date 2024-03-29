@@ -987,7 +987,7 @@
 
         async function loadQuery(hash) {
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
-            const host = getHosts(null);
+            const hosts = getHosts(null);
             const url = host => `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
             const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
             const data = await response.json();
