@@ -94,19 +94,19 @@ It is interesting to explore strange gaps in the map.
 Balloons and Dirigibles are nice.
 
 ### [Indianapolis Balloons:](https://adsb.exposed/?zoom=9&lat=39.6839&lng=274.1898&query=55edbfc4030fa2a5d11e18381f45714a)
-[![Indianapolis Balloons](pictures/.png)]()
+[![Indianapolis Balloons](pictures/indianapolis_balloons.png)](https://adsb.exposed/?zoom=9&lat=39.6839&lng=274.1898&query=55edbfc4030fa2a5d11e18381f45714a)
 
 ### [Project Loon:](https://adsb.exposed/?zoom=8&lat=42.9855&lng=-97.7970&query=070d5c852982451a4a591adf1e843fc1)
-[![Project Loon](pictures/.png)]()
+[![Project Loon](pictures/loon.png)](https://adsb.exposed/?zoom=8&lat=42.9855&lng=-97.7970&query=070d5c852982451a4a591adf1e843fc1)
 
 ### [Balloons over Alps:](https://adsb.exposed/?zoom=7&lat=46.3773&lng=370.1954&query=957e06792b3f21de990ea5e7d3b41555)
-[![Balloons over Alps](pictures/.png)]()
+[![Balloons over Alps](pictures/alps.png)](https://adsb.exposed/?zoom=7&lat=46.3773&lng=370.1954&query=957e06792b3f21de990ea5e7d3b41555)
 
 ### [Zeppelin:](https://adsb.exposed/?zoom=10&lat=40.9685&lng=278.6968&query=d802a21e0db720c55aabe9d5f7503f06&box=41.0931,278.4670,41.0569,278.5219)
-[![Zeppelin](pictures/.png)]()
+[![Zeppelin](pictures/zeppelin.png)](https://adsb.exposed/?zoom=10&lat=40.9685&lng=278.6968&query=d802a21e0db720c55aabe9d5f7503f06&box=41.0931,278.4670,41.0569,278.5219)
 
 ### [Zeppelin in LA:](https://adsb.exposed/?zoom=9&lat=33.7335&lng=242.2996&query=d802a21e0db720c55aabe9d5f7503f06)
-[![Zeppelin in LA](pictures/.png)]()
+[![Zeppelin in LA](pictures/zeppelin_la.png)](https://adsb.exposed/?zoom=9&lat=33.7335&lng=242.2996&query=d802a21e0db720c55aabe9d5f7503f06)
 
 
 In Dubai Airport, the green direct will be a hangar of Emirates Engineering where Airbuses are maintained:
