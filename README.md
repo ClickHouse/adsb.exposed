@@ -10,13 +10,13 @@ The visualization is insanely beautiful.
 [![Helicopters over Manhattan](pictures/manhattan.png)](https://adsb.exposed/?zoom=12&lat=40.7168&lng=285.9893&query=e18e8c8d6a1db73c63953798ad8919a9)
 
 ### [Denver airport:](https://adsb.exposed/?zoom=11&lat=39.8665&lng=255.3566&query=dd3c1af70baafa35055b06fa3556d96e)
-[![Denver airport](pictures/denver.png)](https://adsb.exposed/?zoom=12&lat=40.7168&lng=285.9893&query=e18e8c8d6a1db73c63953798ad8919a9)
+[![Denver airport](pictures/denver.png)](https://adsb.exposed/?zoom=11&lat=39.8665&lng=255.3566&query=dd3c1af70baafa35055b06fa3556d96e)
 
 
 If we zoom into a single airport, we can see where the planes are parked and even color them by a manufacturer or an airline:
 
 ### [Denver airport:](https://adsb.exposed/?zoom=15&lat=39.8592&lng=255.3276&query=b4659aba93f0e495ef2aa837ee793874)
-[![Denver airport](pictures/parking_denver.png)](https://adsb.exposed/?zoom=12&lat=40.7168&lng=285.9893&query=e18e8c8d6a1db73c63953798ad8919a9)
+[![Denver airport](pictures/parking_denver.png)](https://adsb.exposed/?zoom=15&lat=39.8592&lng=255.3276&query=b4659aba93f0e495ef2aa837ee793874)
 
 ### [Amsterdam Schiphol](https://adsb.exposed/?zoom=14&lat=52.3103&lng=364.7577&query=b4659aba93f0e495ef2aa837ee793874)
 
@@ -35,8 +35,8 @@ You can select only military airplanes and find military bases and airfields.
 
 You can select only Helicopters and find hospitals and police stations.
 
-### [VUMC in Amsterdam:](https://adsb.exposed/?zoom=12&lat=52.3446&lng=364.8814&query=e18e8c8d6a1db73c63953798ad8919a9)
-[![VUMC](pictures/vumc.png)](https://adsb.exposed/?zoom=12&lat=52.3446&lng=364.8814&query=e18e8c8d6a1db73c63953798ad8919a9)
+### [VUMC in Amsterdam:](https://adsb.exposed/?zoom=12&lat=52.3446&lng=4.8814&query=e18e8c8d6a1db73c63953798ad8919a9)
+[![VUMC](pictures/vumc.png)](https://adsb.exposed/?zoom=12&lat=52.3446&lng=4.8814&query=e18e8c8d6a1db73c63953798ad8919a9)
 
 ### [In London, helicopters fly over the river:](https://adsb.exposed/?zoom=12&lat=51.5079&lng=359.8960&query=e18e8c8d6a1db73c63953798ad8919a9)
 [![London helicopters](pictures/london_heli.png)](https://adsb.exposed/?zoom=12&lat=51.5079&lng=359.8960&query=e18e8c8d6a1db73c63953798ad8919a9)
@@ -47,8 +47,8 @@ You can select only Helicopters and find hospitals and police stations.
 
 Gliders are also interesting.
 
-### [Gliders in Netherlands near Utrecht:](https://adsb.exposed/?zoom=11&lat=52.1407&lng=365.3043&query=d0df937d8c601cb73c7e4721bea5b7f9)
-[![Gliders in Netherlands near Utrecht](pictures/gliders_utrecht.png)](https://adsb.exposed/?zoom=11&lat=52.1407&lng=365.3043&query=d0df937d8c601cb73c7e4721bea5b7f9)
+### [Gliders in Netherlands near Utrecht:](https://adsb.exposed/?zoom=11&lat=52.1407&lng=5.3043&query=d0df937d8c601cb73c7e4721bea5b7f9)
+[![Gliders in Netherlands near Utrecht](pictures/gliders_utrecht.png)](https://adsb.exposed/?zoom=11&lat=52.1407&lng=5.3043&query=d0df937d8c601cb73c7e4721bea5b7f9)
 
 ### [Gliders near Denver:](https://adsb.exposed/?zoom=9&lat=39.6691&lng=255.2838&query=d0df937d8c601cb73c7e4721bea5b7f9)
 [![Gliders in Netherlands near Utrecht](pictures/gliders_denver.png)](https://adsb.exposed/?zoom=9&lat=39.6691&lng=255.2838&query=d0df937d8c601cb73c7e4721bea5b7f9)
@@ -77,10 +77,10 @@ F-16 military training:
 
 It is interesting to explore strange gaps in the map.
 
-### [Guess what it is?](https://adsb.exposed/?zoom=7&lat=55.5040&lng=380.2597&query=dd3c1af70baafa35055b06fa3556d96e)
-[![Kaliningrad](pictures/kaliningrad.png)](https://adsb.exposed/?zoom=7&lat=55.5040&lng=380.2597&query=dd3c1af70baafa35055b06fa3556d96e)
+### [Guess what it is?](https://adsb.exposed/?zoom=7&lat=55.5040&lng=20.2597&query=dd3c1af70baafa35055b06fa3556d96e)
+[![Kaliningrad](pictures/kaliningrad.png)](https://adsb.exposed/?zoom=7&lat=55.5040&lng=20.2597&query=dd3c1af70baafa35055b06fa3556d96e)
 
-### [Polish air base](https://adsb.exposed/?zoom=11&lat=54.4764&lng=377.1181&query=dd3c1af70baafa35055b06fa3556d96e)
+### [Polish air base](https://adsb.exposed/?zoom=11&lat=54.4764&lng=17.1181&query=dd3c1af70baafa35055b06fa3556d96e)
 
 ### [Maroc air base](https://adsb.exposed/?zoom=8&lat=32.7553&lng=352.4367&query=dd3c1af70baafa35055b06fa3556d96e)
 
@@ -99,8 +99,8 @@ Balloons and dirigibles are nice.
 ### [Project Loon:](https://adsb.exposed/?zoom=8&lat=42.9855&lng=-97.7970&query=070d5c852982451a4a591adf1e843fc1)
 [![Project Loon](pictures/loon.png)](https://adsb.exposed/?zoom=8&lat=42.9855&lng=-97.7970&query=070d5c852982451a4a591adf1e843fc1)
 
-### [Balloons over Alps:](https://adsb.exposed/?zoom=7&lat=46.3773&lng=370.1954&query=957e06792b3f21de990ea5e7d3b41555)
-[![Balloons over Alps](pictures/alps.png)](https://adsb.exposed/?zoom=7&lat=46.3773&lng=370.1954&query=957e06792b3f21de990ea5e7d3b41555)
+### [Balloons over Alps:](https://adsb.exposed/?zoom=7&lat=46.3773&lng=10.1954&query=957e06792b3f21de990ea5e7d3b41555)
+[![Balloons over Alps](pictures/alps.png)](https://adsb.exposed/?zoom=7&lat=46.3773&lng=10.1954&query=957e06792b3f21de990ea5e7d3b41555)
 
 ### [Zeppelin:](https://adsb.exposed/?zoom=10&lat=40.9685&lng=278.6968&query=d802a21e0db720c55aabe9d5f7503f06&box=41.0931,278.4670,41.0569,278.5219)
 [![Zeppelin](pictures/zeppelin.png)](https://adsb.exposed/?zoom=10&lat=40.9685&lng=278.6968&query=d802a21e0db720c55aabe9d5f7503f06&box=41.0931,278.4670,41.0569,278.5219)
@@ -109,20 +109,20 @@ Balloons and dirigibles are nice.
 [![Zeppelin in LA](pictures/zeppelin_la.png)](https://adsb.exposed/?zoom=9&lat=33.7335&lng=242.2996&query=d802a21e0db720c55aabe9d5f7503f06)
 
 
-### [Emirates Engineering:](https://adsb.exposed/?zoom=15&lat=25.2518&lng=415.3630&query=b4659aba93f0e495ef2aa837ee793874)
+### [Emirates Engineering:](https://adsb.exposed/?zoom=15&lat=25.2518&lng=55.3630&query=b4659aba93f0e495ef2aa837ee793874)
 
 In Dubai Airport, the green hairball is a hangar of Emirates Engineering where Airbuses are maintained:
-[![Emirates Engineering](pictures/emirates.png)](https://adsb.exposed/?zoom=15&lat=25.2518&lng=415.3630&query=b4659aba93f0e495ef2aa837ee793874)
+[![Emirates Engineering](pictures/emirates.png)](https://adsb.exposed/?zoom=15&lat=25.2518&lng=55.3630&query=b4659aba93f0e495ef2aa837ee793874)
 
-### [Patroling in Israel:](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
+### [Patroling in Israel:](https://adsb.exposed/?zoom=9&lat=31.1092&lng=34.8488&query=685c788488edb2e156049a356f0f5cf1)
 
 In Israel, there are strange patterns made by patrolling drones:
-[![Patroling in Israel](pictures/israel_patrol.png)](https://adsb.exposed/?zoom=9&lat=31.1092&lng=394.8488&query=685c788488edb2e156049a356f0f5cf1)
+[![Patroling in Israel](pictures/israel_patrol.png)](https://adsb.exposed/?zoom=9&lat=31.1092&lng=34.8488&query=685c788488edb2e156049a356f0f5cf1)
 
-### [Namibia air club:](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=377.9942&query=dd3c1af70baafa35055b06fa3556d96e)
+### [Namibia air club:](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=17.9942&query=dd3c1af70baafa35055b06fa3556d96e)
 
 In Namibia, there is a nice air club:
-[![Namibia air club](pictures/namibia.png)](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=377.9942&query=dd3c1af70baafa35055b06fa3556d96e)
+[![Namibia air club](pictures/namibia.png)](https://adsb.exposed/?zoom=9&lat=-24.1889&lng=17.9942&query=dd3c1af70baafa35055b06fa3556d96e)
 
 Near Toulouse, France, Airbus A-380 does its test flights:
 
