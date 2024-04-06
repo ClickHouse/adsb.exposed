@@ -5,7 +5,7 @@
     <link rel="icon" href="favicon.png">
     <title>ADS-B Massive Visualizer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
-    <style type="text/css">
+    <style>
         :root {
             --progress: 0%;
             --progress-background-color1: #320;
@@ -30,6 +30,7 @@
         }
 
         html, body {
+            background: #101213;
             width: 100%;
             height: 100%;
             padding: 0;
@@ -855,53 +856,80 @@
             return false;
         });
 
-        map.on('mousedown', e => {
-            if (e.originalEvent.button !== 2 && !select_toggle_active) return;
+        function selectStart(e) {
+            if (e.button !== 2 && !select_toggle_active) return;
 
-            selection_origin_point.x = Math.round(e.originalEvent.clientX);
-            selection_origin_point.y = Math.round(e.originalEvent.clientY);
+            const rect = map_elem.getBoundingClientRect();
+            const x = e.clientX - rect.x;
+            const y = e.clientY - rect.y;
 
-            selected_box[0] = latlngToMercator(e.latlng);
+            selection_origin_point.x = Math.round(x);
+            selection_origin_point.y = Math.round(y);
+
+            selected_box[0] = latlngToMercator(map.containerPointToLatLng([x, y]));
 
             selection.style.display = 'block';
-            selection.style.left = Math.round(e.containerPoint.x) + 'px';
-            selection.style.top = Math.round(e.containerPoint.y) + 'px';
+            selection.style.left = selection_origin_point.x + 'px';
+            selection.style.top = selection_origin_point.y + 'px';
             selection.style.width = 0;
             selection.style.height = 0;
             selecting = true;
-        });
 
-        map.on('mousemove', e => {
+            e.preventDefault();
+        }
+
+        map_elem.addEventListener('pointerdown', selectStart);
+        /// https://www.redblobgames.com/making-of/draggable/
+        map_elem.addEventListener('touchstart', e => e.preventDefault());
+
+        function selectMove(e) {
             if (!selecting) return;
 
-            if (e.originalEvent.clientX >= selection_origin_point.x) {
-                selection.style.width = Math.round(e.originalEvent.clientX - selection_origin_point.x) + 'px';
+            const rect = map_elem.getBoundingClientRect();
+            const x = e.clientX - rect.x;
+            const y = e.clientY - rect.y;
+
+            if (x >= selection_origin_point.x) {
+                selection.style.width = Math.round(x - selection_origin_point.x) + 'px';
             } else {
-                selection.style.left = Math.round(e.containerPoint.x) + 'px';
-                selection.style.width = Math.round(selection_origin_point.x - e.originalEvent.clientX) + 'px';
+                selection.style.left = Math.round(x) + 'px';
+                selection.style.width = Math.round(selection_origin_point.x - x) + 'px';
             }
 
-            if (e.originalEvent.clientY >= selection_origin_point.y) {
-                selection.style.height = Math.round(e.originalEvent.clientY - selection_origin_point.y) + 'px';
+            if (y >= selection_origin_point.y) {
+                selection.style.height = Math.round(y - selection_origin_point.y) + 'px';
             } else {
-                selection.style.top = Math.round(e.containerPoint.y) + 'px';
-                selection.style.height = Math.round(selection_origin_point.y - e.originalEvent.clientY) + 'px';
+                selection.style.top = Math.round(y) + 'px';
+                selection.style.height = Math.round(selection_origin_point.y - y) + 'px';
             }
-        });
 
-        map.on('mouseup', e => {
-            if ((e.originalEvent.button !== 2 && !select_toggle_active) || !selecting) return;
+            e.preventDefault();
+        };
+
+        map_elem.addEventListener('pointermove', selectMove);
+
+        function selectStop(e) {
+            if ((e.button !== 2 && !select_toggle_active) || !selecting) return;
             selecting = false;
 
-            if (selection_origin_point.x == Math.round(e.originalEvent.clientX) &&
-                selection_origin_point.y == Math.round(e.originalEvent.clientY)) {
+            const rect = map_elem.getBoundingClientRect();
+            const x = e.clientX - rect.x;
+            const y = e.clientY - rect.y;
+
+            if (selection_origin_point.x == Math.round(x) &&
+                selection_origin_point.y == Math.round(y)) {
                 hideSelection();
             } else {
-                selected_box[1] = latlngToMercator(e.latlng);
+                selected_box[1] = latlngToMercator(map.containerPointToLatLng([x, y]));
                 showReport();
                 updateHistory();
             }
-        });
+
+            e.preventDefault();
+        };
+
+        map_elem.addEventListener('pointerup', selectStop);
+        map_elem.addEventListener('pointercancel', selectStop);
 
         /// Progress bar
 
