@@ -179,6 +179,7 @@ It is possible to collect this data out of thin air using your own radio receive
 
 We use the data from two sources: [ADSB.lol](https://www.adsb.lol/) (full historical data is provided without restrictions: 30..50 million records per day, available since 2023) and [ADSB-Exchange](https://www.adsbexchange.com/products/historical-data/) (only provides samples of data from first day of each month: around 1.2 billion records per day with better coverage).
 
+Contains information from [ADSB.lol](https://www.adsb.lol/), which is made available here under the [Open Database License (ODbL)](https://github.com/adsblol/globe_history_2024/blob/main/LICENSE-ODbL.txt).
 
 ## Implementation Details
 
@@ -543,6 +544,7 @@ This blog post shows how to analyze a single day of data using a Python script. 
 ### List Of Exchanges
 
 - https://adsb.lol/ - the best resource, provides historical data for download with no strings attached;
+  This database is made available under the Open Database License: http://opendatacommons.org/licenses/odbl/1.0/.
 - https://adsb.fi/ - advertises open and unfiltered access, but does not provide batch data access;
 - https://adsb.one/ - advertises being dedicated to public interest, but does not provide batch data access;
 - https://adsb.im/ - does not provide batch data access;
