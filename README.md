@@ -547,7 +547,6 @@ This blog post shows how to analyze a single day of data using a Python script. 
   This database is made available under the Open Database License: http://opendatacommons.org/licenses/odbl/1.0/.
 - https://adsb.fi/ - advertises open and unfiltered access, but does not provide batch data access;
 - https://adsb.one/ - advertises being dedicated to public interest, but does not provide batch data access;
-- https://adsb.im/ - does not provide batch data access;
 - https://www.adsbhub.org/
 - https://adsbexchange.com/ - a large data archive, but no longer provides the full data publicly after the acquisition;
 - https://flightaware.com/
