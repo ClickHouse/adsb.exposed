@@ -80,7 +80,7 @@ CREATE MATERIALIZED VIEW view_sample100 TO planes_mercator_sample100 AS SELECT *
 
 
 CREATE USER website IDENTIFIED WITH sha256_hash BY 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855'
-SETTINGS 
+SETTINGS
     add_http_cors_header = 1,
     max_result_rows = 1048576,
     network_compression_method = 'zstd',
@@ -92,6 +92,7 @@ SETTINGS
     query_cache_ttl = 8640000,
     query_cache_share_between_users = 1,
     analyze_index_with_space_filling_curves = 0,
+    max_execution_time = 180,
     priority CHANGEABLE_IN_READONLY,
     readonly = 1;
 
@@ -108,7 +109,7 @@ TO website;
 
 
 CREATE USER website_progress IDENTIFIED WITH sha256_hash BY 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855'
-SETTINGS 
+SETTINGS
     add_http_cors_header = 1,
     max_result_rows = 1024,
     skip_unavailable_shards = 1,
