@@ -308,8 +308,8 @@
     <div id="provider">
         <form>
             <label>
-                <input type="radio" name="provider" value="race" checked>
-                Race
+                <input type="radio" name="provider" value="any" checked>
+                Any
             </label>
             <br/>
             <label>
@@ -449,7 +449,7 @@
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
                 progress_update_period = 1;
-                const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+                const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -690,7 +690,7 @@
                     `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
 
                 progress_update_period = 1;
-                const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+                const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -1057,7 +1057,7 @@
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
             const hosts = getHosts(null);
             const url = host => `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
-            const response = await Promise.race(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+            const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
             const data = await response.json();
             return data.data[0].text;
         }
