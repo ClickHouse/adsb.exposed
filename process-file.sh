@@ -2,6 +2,7 @@
 
 INPUT=$1
 TMPFILE=/tmp/$$
+#SOURCE='adsb.lol'
 
 gzip -cd "$INPUT" | sed '/^"trace"/Q' | tr -d '\n' | sed -r -e 's/,$/}\n/' > ${TMPFILE}.meta.jsonl
 gzip -cd "$INPUT" | grep '^\[' | sed -r -e 's/ ]$/,/' > ${TMPFILE}.data.jsonl
@@ -58,7 +59,8 @@ clickhouse-local --query "
         geometric_altitude,
         geometric_vertical_rate,
         indicated_airspeed,
-        roll_angle
+        roll_angle,
+        '${SOURCE}'
     FROM
         file('${TMPFILE}.data.jsonl', JSONCompactEachRow, '
             time_offset Decimal64(3),

@@ -69,7 +69,9 @@ CREATE TABLE planes_mercator
     geometric_altitude Int32,
     geometric_vertical_rate Int32,
     indicated_airspeed Int32,
-    roll_angle Float32
+    roll_angle Float32,
+
+    data_source Enum8('', 'adsb.lol', 'adsbexchange', 'airplanes.live')
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), time);
 
 CREATE TABLE planes_mercator_sample10 AS planes_mercator;
