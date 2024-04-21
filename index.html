@@ -418,6 +418,37 @@
             }
         }
 
+        class CustomError extends Error {
+            constructor(message, payload) {
+                super(message);
+                this.name = this.constructor.name;
+                this.payload = payload;
+            }
+        }
+
+        /// Returns the first successful (HTTP 2xx) response or an error if all of them failed.
+        /// Cancels other requests on first success.
+        function fetchAny(urls, params) {
+            const abort_controllers = {};
+            urls.forEach(url => abort_controllers[url] = new AbortController);
+
+            const requests = urls.map(url => {
+                const abort_controller = abort_controllers[url];
+                params.signal = abort_controller.signal;
+                return fetch(url, params).then(response => {
+                    if (response.ok) {
+                        urls.filter(other => other != url).map(other => abort_controllers[other].abort());
+                        return response;
+                    }
+                    throw new CustomError(response.statusText, response);
+                }).catch(error => {
+                    return Promise.reject(error);
+                })
+            });
+
+            return Promise.any(requests);
+        }
+
         document.querySelector('form').addEventListener('change', e => {
             cached_tiles = {};
             main_layer_sample100.redraw();
@@ -449,20 +480,22 @@
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
                 progress_update_period = 1;
-                const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
 
-                if (!response.ok) {
+                try {
+                    const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
+                    buf = await response.arrayBuffer();
+                    cached_tiles[key][priority] = buf;
+                } catch (error) {
+                    const response = error.errors[0].payload;
                     const text = await response.text();
-                    if (!text.includes('QUERY_WAS_CANCELLED') && !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
+                    if (!text.includes('QUERY_WAS_CANCELLED') &&
+                        !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
                         let err = document.getElementById('error');
                         err.textContent = text;
                         err.style.display = 'block';
                     }
                     return;
                 }
-
-                buf = await response.arrayBuffer();
-                cached_tiles[key][priority] = buf;
             }
 
             let ctx = tile.getContext('2d');
@@ -690,7 +723,7 @@
                     `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
 
                 progress_update_period = 1;
-                const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+                const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
 
                 if (!response.ok) {
                     const text = await response.text();
@@ -1057,7 +1090,7 @@
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
             const hosts = getHosts(null);
             const url = host => `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
-            const response = await Promise.any(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
+            const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
             const data = await response.json();
             return data.data[0].text;
         }
