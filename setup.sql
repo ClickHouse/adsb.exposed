@@ -85,8 +85,8 @@ CREATE USER website IDENTIFIED WITH sha256_hash BY 'E3B0C44298FC1C149AFBF4C8996F
 SETTINGS
     add_http_cors_header = 1,
     max_result_rows = 1048576,
-    network_compression_method = 'zstd',
-    network_zstd_compression_level = 6,
+    enable_http_compression = 1,
+    http_zlib_compression_level = 6,
     replace_running_query = 1,
     skip_unavailable_shards = 1,
     max_parallel_replicas = 100,
@@ -96,6 +96,7 @@ SETTINGS
     analyze_index_with_space_filling_curves = 0,
     max_execution_time = 180,
     priority CHANGEABLE_IN_READONLY,
+    read_through_distributed_cache = 0,
     readonly = 1;
 
 GRANT SELECT ON default.planes_mercator TO website;
