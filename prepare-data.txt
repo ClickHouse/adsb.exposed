@@ -6,7 +6,7 @@ cat *.json | jq -c '.' | grep prod | sed -r 's/\{"name":"(.+?)","url":"(.+?)"\}/
 
 for i in *.tar; do echo $i && mkdir ${i%.tar} && (cd ${i%.tar} && tar xf ../$i) && rm $i; done
 
-find *readsb*/traces -name '*.json' | xargs -P $(nproc) -L1 ~/process-file.sh
+~/process-file.sh "*readsb*/traces/**/*.json"
 
 
 # https://www.adsbexchange.com/products/historical-data/
