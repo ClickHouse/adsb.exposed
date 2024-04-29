@@ -177,9 +177,11 @@ ADS-B (Automatic Dependent Surveillance–Broadcast) is a radio protocol that is
 
 It is possible to collect this data out of thin air using your own radio receiver (e.g., in the form of SDR), although your receiver will see the data only in a certain range of your location. There are platforms for sharing and exchange of this data. Some of these platforms invite participants to share the data but restrict its redistribution by providing commercial access to it. While the source data, broadcast by airplanes, is essentially public domain, the companies may produce and license derivative works from this data.
 
-We use the data from two sources: [ADSB.lol](https://www.adsb.lol/) (full historical data is provided without restrictions: 30..50 million records per day, available since 2023) and [ADSB-Exchange](https://www.adsbexchange.com/products/historical-data/) (only provides samples of data from first day of each month: around 1.2 billion records per day with better coverage).
+We use the data from three sources: [ADSB.lol](https://www.adsb.lol/) (full historical data is provided without restrictions: 30..50 million records per day, available since 2023),
+[Airplanes.live](https://airplanes.live/) (full historical data since 2023, 30..70 million records per day, and live real-time feed - they provide this data to us with the following restrictions: - no reselling the data; - no commercial use (except for within this application) without an agreement; - attribution is required)
+and [ADSB-Exchange](https://www.adsbexchange.com/products/historical-data/) (only provides samples of data from first day of each month: around 1.2 billion records per day with better coverage).
 
-Contains information from [ADSB.lol](https://www.adsb.lol/), which is made available here under the [Open Database License (ODbL)](https://github.com/adsblol/globe_history_2024/blob/main/LICENSE-ODbL.txt).
+The data from [ADSB.lol](https://www.adsb.lol/), is made available under the [Open Database License (ODbL)](https://github.com/adsblol/globe_history_2024/blob/main/LICENSE-ODbL.txt).
 
 ## Implementation Details
 
@@ -208,7 +210,7 @@ const layer_options = {
     maxZoom: 19,
     minNativeZoom: 2,
     maxNativeZoom: 16,
-    attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: adsb.lol, adsbexchange.com)'
+    attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: adsb.lol, airplanes.live, adsbexchange.com)'
 };
 ```
 
@@ -545,6 +547,7 @@ This blog post shows how to analyze a single day of data using a Python script. 
 
 - https://adsb.lol/ - the best resource, provides historical data for download with no strings attached;
   This database is made available under the Open Database License: http://opendatacommons.org/licenses/odbl/1.0/.
+- https://airplanes.live/ - currently aggregates data from nearly 1700 feeders globally; they have a legal agreement preventing sale of this data (to avoid situations like with adsbexchange); they share the data on a selective basis;
 - https://adsb.fi/ - advertises open and unfiltered access, but does not provide batch data access;
 - https://adsb.one/ - advertises being dedicated to public interest, but does not provide batch data access;
 - https://www.adsbhub.org/
