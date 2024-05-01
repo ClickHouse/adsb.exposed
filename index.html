@@ -314,7 +314,7 @@
             <br/>
             <label>
                 <input type="radio" name="provider" value="cloud">
-                Cloud
+                Cloud (Experiments)
             </label>
             <br/>
             <label>
@@ -392,6 +392,20 @@
             /// Firefox has code 13 for Enter and Chromium has code 10.
             if ((event.metaKey || event.ctrlKey) && (event.keyCode == 13 || event.keyCode == 10)) {
                 collapseQueryEditor();
+            }
+        });
+
+        const cheat_code = 'iddqd';
+        let input_sequence = [];
+        document.addEventListener('keydown', e => {
+            input_sequence.push(event.key.toLowerCase());
+
+            if (input_sequence.length > cheat_code.length) {
+                input_sequence.shift();
+            }
+
+            if (input_sequence.join('') === cheat_code) {
+                document.getElementById('provider').style.display = 'block';
             }
         });
 
