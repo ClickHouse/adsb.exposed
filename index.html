@@ -600,6 +600,12 @@
                 selected_box = [latlngToMercator({lat: +arr[0], lng: +arr[1]}), latlngToMercator({lat: +arr[2], lng: +arr[3]})];
                 showReport();
             }
+        } else {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    map.setView([position.coords.latitude, position.coords.longitude]);
+                });
+            }
         }
 
         /// Sequential loading for different levels of details
