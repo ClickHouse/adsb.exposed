@@ -342,6 +342,15 @@
             opacity: 0.1,
         });
 
+        let map = L.map('map', {
+            center: [52.3676, 4.9041],
+            zoom: 5,
+            worldCopyJump: true,
+            layers: [base_layer]
+        });
+
+        map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
+
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
         let selected_box = [];
@@ -358,13 +367,15 @@
 
         function collapseQueryEditor() {
             query_elem.style.height = '4.5em';
+            query_elem.blur();
+        }
 
+        function updateMap() {
             let selected_example = document.querySelector('#examples .selected');
             if (selected_example && query_elem.value != queries[selected_example.textContent]) {
                 selected_example.classList.remove('selected');
             }
 
-            query_elem.blur();
             main_layer_sample100.redraw();
             if (selected_box.length == 2) showReport();
         }
@@ -372,6 +383,7 @@
         function setQuery(value) {
             query_elem.value = value;
             collapseQueryEditor();
+            updateMap();
         }
 
         for (elem of document.querySelectorAll('#examples span')) {
@@ -386,12 +398,14 @@
 
         query_elem.addEventListener('input', expandQueryEditor);
         query_elem.addEventListener('focus', expandQueryEditor);
+        query_elem.addEventListener('blur', updateMap);
         map_elem.addEventListener('focus', collapseQueryEditor);
 
         query_elem.addEventListener('keydown', e => {
             /// Firefox has code 13 for Enter and Chromium has code 10.
             if ((event.metaKey || event.ctrlKey) && (event.keyCode == 13 || event.keyCode == 10)) {
                 collapseQueryEditor();
+                updateMap();
             }
         });
 
@@ -465,7 +479,7 @@
 
         document.querySelector('form').addEventListener('change', e => {
             cached_tiles = {};
-            main_layer_sample100.redraw();
+            updateMap();
         });
 
         /// Rendering
@@ -478,9 +492,6 @@
             const key = `${sql}-${coords.z}-${coords.x}-${coords.y}`;
 
             if (!cached_tiles[key]) cached_tiles[key] = [];
-
-            /// If there is a higer-detail tile, skip rendering of this level of detal.
-            if (cached_tiles[key][priority + 1]) return;
 
             buf = cached_tiles[key][priority];
 
@@ -560,15 +571,6 @@
 
         setQuery(queries[document.querySelector('#examples .selected').textContent]);
 
-        let map = L.map('map', {
-            center: [52.3676, 4.9041],
-            zoom: 5,
-            worldCopyJump: true,
-            layers: [base_layer]
-        });
-
-        map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
-
         /// Restore from a saved link
 
         function latlngToMercator(latlng) {
@@ -589,7 +591,6 @@
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
-                    collapseQueryEditor();
                 });
             } else {
                 map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
@@ -608,9 +609,9 @@
             }
         }
 
-        /// Sequential loading for different levels of details
-
         main_layer_sample100.addTo(map);
+
+        /// Sequential loading for different levels of details
 
         main_layer_sample100.on('load', e => {
             main_layer_sample10.addTo(map);
