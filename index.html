@@ -243,7 +243,7 @@
 
         #provider {
             display: none;
-            left: 7em;
+            right: 0em;
             bottom: 1em;
             height: 4em;
             padding: 0.1em .3em 0.1em 0.3em;
@@ -314,17 +314,12 @@
             <br/>
             <label>
                 <input type="radio" name="provider" value="cloud">
-                Cloud (Experiments)
+                Cloud (Real-Time)
             </label>
             <br/>
             <label>
                 <input type="radio" name="provider" value="self-hosted-intel">
-                Self-hosted (Intel)
-            </label>
-            <br/>
-            <label>
-                <input type="radio" name="provider" value="self-hosted-graviton">
-                Self-hosted (Graviton)
+                Self-hosted (Snapshot)
             </label>
         </form>
     </div>
@@ -428,8 +423,6 @@
 
             if (provider == 'self-hosted-intel') {
                 return ['https://fly-selfhosted-backend.clickhouse.com'];
-            } else if (provider == 'self-hosted-graviton') {
-                return ['https://fly-selfhosted-backend-2.clickhouse.com'];
             } else {
                 let prefix = '';
                 if (stick) {
