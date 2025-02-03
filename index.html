@@ -422,7 +422,7 @@
             const provider = document.querySelector('input[name="provider"]:checked').value;
 
             if (provider == 'self-hosted-intel') {
-                return ['https://fly-selfhosted-backend.clickhouse.com'];
+                return ['https://fly-selfhosted-backend-3.clickhouse.com'];
             } else {
                 let prefix = '';
                 if (stick) {
@@ -434,7 +434,7 @@
                 if (provider == 'cloud') {
                     return [cloud_host];
                 } else {
-                    return [cloud_host, 'https://fly-selfhosted-backend.clickhouse.com'];
+                    return [cloud_host, 'https://fly-selfhosted-backend-3.clickhouse.com'];
                 }
             }
         }
