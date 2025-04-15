@@ -991,7 +991,7 @@
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
             const hosts = getHosts(uuid);
-            const url = host => `${host}/?user=website_progress&default_format=JSON&param_uuid=${uuid}`;
+            const url = host => `${host}/?user=website_progress&default_format=JSON&skip_unavailable_shards=1&param_uuid=${uuid}`;
 
             let responses = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
             let datas = await Promise.all(responses.map(response => response.json()));
