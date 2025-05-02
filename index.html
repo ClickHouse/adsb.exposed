@@ -40,8 +40,25 @@
         body {
             display: grid;
             grid-template-columns: auto var(--report-width);
-            grid-template-rows: fit-content(10%) fit-content(2em) 1em auto;
+            grid-template-rows: fit-content(2em) fit-content(10%) fit-content(2em) 1em auto;
             grid-gap: 0;
+        }
+
+        #proud {
+            font-family: sans-serif;
+            font-size: 14pt;
+            background: linear-gradient(
+                90deg,
+                white 0%,
+                white 15%,
+                yellow 50%,
+                white 85%,
+                white 100%
+            );
+            color: black;
+            text-align: center;
+            padding: 0.125em;
+            text-decoration: none;
         }
 
         #query {
@@ -262,6 +279,7 @@
 </head>
 
 <body>
+    <a id="proud" href="https://github.com/ClickHouse/ClickHouse">Proudly made with <b>ClickHouse</b> open-source database</a>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
     <div id="examples">Examples:
         <span class="selected">Altitude &amp; Velocity</span>
