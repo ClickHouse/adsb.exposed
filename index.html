@@ -326,6 +326,7 @@
         let uuid = crypto.randomUUID();
 
         let examples_elem = document.getElementById('examples');
+
         Object.keys(queries).forEach((example, idx) => {
             let span = document.createElement('span');
             if (!idx) { span.className = 'selected'; }
@@ -387,12 +388,16 @@
             updateMap();
         }
 
+        function selectExample(elem) {
+            for (other of document.querySelectorAll('#examples span')) {
+                other.classList.remove('selected');
+            }
+            elem.classList.add('selected');
+        }
+
         for (elem of document.querySelectorAll('#examples span')) {
             elem.addEventListener('click', e => {
-                for (other of document.querySelectorAll('#examples span')) {
-                    other.classList.remove('selected');
-                }
-                e.target.classList.add('selected');
+                selectExample(e.target);
                 setQuery(queries[e.target.textContent]);
             });
         }
@@ -558,6 +563,13 @@
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+
+                    for (example of document.querySelectorAll('#examples span')) {
+                        example.classList.remove('selected');
+                        if (query == queries[example.innerText]) {
+                            example.classList.add('selected');
+                        }
+                    }
                 });
             } else {
                 map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
