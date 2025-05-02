@@ -62,6 +62,17 @@
             text-decoration: none;
         }
 
+        #proud:hover {
+            background: linear-gradient(
+                90deg,
+                yellow 0%,
+                yellow 15%,
+                white 50%,
+                yellow 85%,
+                yellow 100%
+            );
+        }
+
         #query {
             grid-column: span 2;
             width: 100%;
@@ -858,6 +869,13 @@
                 });
             }
 
+            const reports = [
+                { query: sql_flights, field: 'aircraft_flight', id: 'report_flights', title: 'Flights: ', separator: ', ', content: (row => row.aircraft_flight) },
+                { query: sql_types, field: 't', id: 'report_types', title: 'Types:\n', separator: ',\n', content: (row => `${row.t} (${row.desc})`) },
+                { query: sql_registration, field: 'r', id: 'report_regs', title: 'Registration: ', separator: ', ', content: (row => row.r) },
+                { query: sql_owner, field: 'ownOp', id: 'report_owners', title: 'Owner:\n', separator: ',\n', content: (row => row.ownOp) },
+           ];
+
             calculateReport(sql_total).then(json => {
                 const row = json.data[0];
 
@@ -874,10 +892,9 @@
                 }
             });
 
-            createList(sql_flights, 'aircraft_flight', 'report_flights', 'Flights: ', ', ', (row => row.aircraft_flight));
-            createList(sql_types, 't', 'report_types', 'Types:\n', ',\n', (row => `${row.t} (${row.desc})`));
-            createList(sql_registration, 'r', 'report_regs', 'Registration: ', ', ', (row => row.r));
-            createList(sql_owner, 'ownOp', 'report_owners', 'Owner:\n', ',\n', (row => row.ownOp));
+            reports.forEach(report => {
+                createList(report.query, report.field, report.id, report.title, report.separator, report.content);
+            });
         }
 
         function hideReport() {
