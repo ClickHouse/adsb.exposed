@@ -45,6 +45,7 @@
         }
 
         #proud {
+            grid-column: span 2;
             font-family: sans-serif;
             font-size: 14pt;
             background: linear-gradient(
@@ -145,16 +146,19 @@
             display: inline-block;
             padding: .25em .5em;
             background: #444;
+            border: solid 0.125em black;
             user-select: none;
         }
 
-        #examples span:hover {
-            background: #840;
+        #examples span:hover, #examples span.selected:hover {
+            color: black;
+            background: yellow;
             cursor: pointer;
         }
 
         #examples span.selected {
-            background: #666;
+            background: #FFF;
+            color: #000;
         }
 
         #report {
@@ -181,9 +185,9 @@
         }
 
         #report a:hover {
-            color: #FC0;
+            color: yellow;
             background: black;
-            border-bottom: 1px dashed #FC0;
+            border-bottom: 1px dashed yellow;
             box-shadow: 0px 0px 10px rgba(0,0,0,1);
             font-weight: bold;
         }
@@ -281,32 +285,7 @@
 <body>
     <a id="proud" href="https://github.com/ClickHouse/ClickHouse">Proudly made with <b>ClickHouse</b> open-source database</a>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
-    <div id="examples">Examples:
-        <span class="selected">Altitude &amp; Velocity</span>
-        <span>Boeing vs. Airbus</span>
-        <span>Helicopters</span>
-        <span>Hi-Performance</span>
-        <span>Light</span>
-        <span>Gliders</span>
-        <span>Ultralight</span>
-        <span>Military</span>
-        <span>Vertical Speed</span>
-        <span>Roll Angle</span>
-        <span>Steep</span>
-        <span>Year</span>
-        <span>A380</span>
-        <span>IL-76</span>
-        <span>F-16</span>
-        <span>KLM</span>
-        <span>N2163J</span>
-        <span>Event Time</span>
-        <span>Weekends</span>
-        <span>Emergency</span>
-        <span>Balloons</span>
-        <span>Ground Vehicles</span>
-        <span>Elon Musk</span>
-        <span>All Airlines</span>
-    </div>
+    <div id="examples">Examples:&nbsp;</div>
     <div id="stats"></div>
     <div id="map"><div id="selection"></div></div>
     <div id="report">
@@ -345,6 +324,16 @@
     <script src="examples.js"></script>
     <script>
         let uuid = crypto.randomUUID();
+
+        let examples_elem = document.getElementById('examples');
+        let first_example = true;
+        Object.keys(queries).forEach(example => {
+            let span = document.createElement('span');
+            if (first_example) { span.className = 'selected'; }
+            first_example = false;
+            span.append(document.createTextNode(example));
+            examples_elem.append(span);
+        });
 
         let base_layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             zoomOffset: 0,
@@ -642,7 +631,7 @@
 
         select_toggle.addEventListener('click', e => {
             select_toggle_active = !select_toggle_active;
-            select_toggle.style.backgroundColor = select_toggle_active ? 'orange' : '';
+            select_toggle.style.backgroundColor = select_toggle_active ? 'yellow' : '';
 
             if (select_toggle_active) {
                 map.dragging.disable();
