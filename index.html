@@ -326,11 +326,9 @@
         let uuid = crypto.randomUUID();
 
         let examples_elem = document.getElementById('examples');
-        let first_example = true;
-        Object.keys(queries).forEach(example => {
+        Object.keys(queries).forEach((example, idx) => {
             let span = document.createElement('span');
-            if (first_example) { span.className = 'selected'; }
-            first_example = false;
+            if (!idx) { span.className = 'selected'; }
             span.append(document.createTextNode(example));
             examples_elem.append(span);
         });
@@ -342,6 +340,8 @@
             attribution: '© OpenStreetMap',
             opacity: 0.1,
         });
+
+        let layers = [];
 
         let map = L.map('map', {
             center: [52.3676, 4.9041],
@@ -377,7 +377,7 @@
                 selected_example.classList.remove('selected');
             }
 
-            main_layer_sample100.redraw();
+            layers[0]?.redraw();
             if (selected_box.length == 2) showReport();
         }
 
@@ -467,26 +467,32 @@
             updateMap();
         });
 
+        const levels = [
+            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'planes_mercator',           sample: 1,   priority: 3 },
+        ];
+
         /// Rendering
 
         let progress_update_period = null;
         let query_sequence_num = 0;
 
-        async function render(table, priority, coords, tile) {
+        async function render(level, coords, tile) {
             const sql = query_elem.value;
             const key = `${sql}-${coords.z}-${coords.x}-${coords.y}`;
 
             if (!cached_tiles[key]) cached_tiles[key] = [];
 
-            buf = cached_tiles[key][priority];
+            buf = cached_tiles[key][level.priority];
 
             if (!buf) {
                 ++query_sequence_num;
-                const query_id = `${uuid}-${query_sequence_num}-${table}-${coords.z - 2}-${coords.x}-${coords.y}`;
+                const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
                 const hosts = getHosts(key);
                 const url = host => `${host}/?user=website&default_format=RowBinary` +
                     `&query_id=${query_id}&replace_running_query=1` +
-                    `&param_table=${table}&param_sampling=${[0, 100, 10, 1][priority]}` +
+                    `&param_table=${level.table}&param_sampling=${level.sample}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
                 progress_update_period = 1;
@@ -494,7 +500,7 @@
                 try {
                     const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
                     buf = await response.arrayBuffer();
-                    cached_tiles[key][priority] = buf;
+                    cached_tiles[key][level.priority] = buf;
                 } catch (error) {
                     const response = error.errors[0].payload;
                     const text = await response.text();
@@ -525,34 +531,10 @@
                 let tile = L.DomUtil.create('canvas', 'leaflet-tile');
                 tile.width = 1024;
                 tile.height = 1024;
-                render(this.options.table, this.options.priority, coords, tile).then(err => done(err, tile));
+                render(this.options.level, coords, tile).then(err => done(err, tile));
                 return tile;
             }
         });
-
-        const layer_options = {
-            tileSize: 1024,
-            minZoom: 2,
-            maxZoom: 19,
-            minNativeZoom: 2,
-            maxNativeZoom: 16,
-            attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: © adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com)'
-        };
-
-        let layer_options_full = layer_options;
-        layer_options_full.table = 'planes_mercator';
-        layer_options_full.priority = 3;
-        let main_layer_full = new L.GridLayer.ClickHouse(layer_options_full);
-
-        let layer_options_sample10 = layer_options;
-        layer_options_sample10.table = 'planes_mercator_sample10';
-        layer_options_full.priority = 2;
-        let main_layer_sample10 = new L.GridLayer.ClickHouse(layer_options_sample10);
-
-        let layer_options_sample100 = layer_options;
-        layer_options_sample100.table = 'planes_mercator_sample100';
-        layer_options_full.priority = 1;
-        let main_layer_sample100 = new L.GridLayer.ClickHouse(layer_options_sample100);
 
         setQuery(queries[document.querySelector('#examples .selected').textContent]);
 
@@ -594,34 +576,42 @@
             }
         }
 
-        main_layer_sample100.addTo(map);
+        const layer_options = {
+            tileSize: 1024,
+            minZoom: 2,
+            maxZoom: 19,
+            minNativeZoom: 2,
+            maxNativeZoom: 16,
+            attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: © adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com)'
+        };
+
+        levels.forEach((level, idx) => {
+            let options = layer_options;
+            options.level = level;
+            layers.push(new L.GridLayer.ClickHouse(options));
+        });
+
+        layers[0].addTo(map);
+        layers[0].on('loading', e => {
+            layers.forEach((layer, idx) => {
+                if (idx) { layer.removeFrom(map); }
+            });
+            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
+            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
+        });
 
         /// Sequential loading for different levels of details
 
-        main_layer_sample100.on('load', e => {
-            main_layer_sample10.addTo(map);
-            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color2)');
-            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color2)');
-            updateHistory();
-        });
-
-        main_layer_sample10.on('load', e => {
-            main_layer_full.addTo(map);
-            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color3)');
-            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color3)');
-        });
-
-        main_layer_full.on('load', e => {
-            document.documentElement.style.setProperty('--progress', '0');
-            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color4)');
-            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color4)');
-        });
-
-        main_layer_sample100.on('loading', e => {
-            main_layer_full.removeFrom(map);
-            main_layer_sample10.removeFrom(map);
-            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
-            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
+        layers.forEach((layer, idx) => {
+            layer.on('load', e => {
+                if (idx + 1 < layers.length) {
+                    layers[idx + 1].addTo(map);
+                } else {
+                    document.documentElement.style.setProperty('--progress', '0');
+                }
+                document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${idx + 2})`);
+                document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${idx + 2})`);
+            });
         });
 
         /// Rectangle selection and reports
@@ -722,7 +712,7 @@
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
                 const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
-                    `&param_table=planes_mercator` +
+                    `&param_table=${levels[levels.length - 1].table}` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
                     `&param_top=${Math.min(selected_box[0].y, selected_box[1].y)}` +
