@@ -3,25 +3,19 @@
 <head>
     <meta charset="utf-8">
     <link rel="icon" href="favicon.png">
-    <title>ADS-B Massive Visualizer</title>
+    <title>Foursquare Visualizer</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
     <style>
         :root {
             --progress: 0%;
             --progress-background-color1: #320;
-            --progress-foreground-color1: #840;
+            --progress-foreground-color1: #FF0;
 
-            --progress-background-color2: #330;
-            --progress-foreground-color2: #880;
+            --progress-background-color2: #333;
+            --progress-foreground-color2: #666;
 
-            --progress-background-color3: #033;
-            --progress-foreground-color3: #088;
-
-            --progress-background-color4: #333;
-            --progress-foreground-color4: #666;
-
-            --progress-background-color: var(--progress-background-color4);
-            --progress-foreground-color: var(--progress-foreground-color4);
+            --progress-background-color: var(--progress-background-color2);
+            --progress-foreground-color: var(--progress-foreground-color2);
 
             --report-width: 0%;
         }
@@ -231,7 +225,7 @@
             color: #088;
         }
 
-        #layers, #provider, #select {
+        #layers, #select {
             position: absolute;
             padding: .3em .5em .2em .5em;
             font-family: monospace;
@@ -242,7 +236,7 @@
             user-select: none;
         }
 
-        #layers:hover, #provider:hover, #select:hover {
+        #layers:hover, #select:hover {
             filter: brightness(125%);
         }
 
@@ -272,24 +266,6 @@
             padding-top: 13%;
             width: 120%;
         }
-
-        #provider {
-            right: 0.25em;
-            bottom: 1.25em;
-            height: 3em;
-            padding: 0.1em .3em 0.1em 0.3em;
-            font-size: 16pt;
-        }
-
-        #provider form {
-            font-size: 12pt;
-            color: #333;
-        }
-
-        #provider * {
-            margin: 0;
-            padding: 0;
-        }
     </style>
 </head>
 
@@ -311,25 +287,6 @@
     <div id="error"></div>
     <div id="layers">👁</div>
     <div id="select"><img src="pointer.svg"/></div>
-
-    <div id="provider">
-        <form>
-            <label>
-                <input type="radio" name="provider" value="any" checked>
-                Any
-            </label>
-            <br/>
-            <label>
-                <input type="radio" name="provider" value="cloud">
-                Cloud (Real-Time)
-            </label>
-            <br/>
-            <label>
-                <input type="radio" name="provider" value="self-hosted-intel">
-                Self-hosted (Snapshot)
-            </label>
-        </form>
-    </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
     <script src="examples.js"></script>
@@ -427,24 +384,13 @@
         });
 
         function getHosts(stick) {
-            const provider = document.querySelector('input[name="provider"]:checked').value;
-
-            if (provider == 'self-hosted-intel') {
-                return ['https://fly-selfhosted-backend-3.clickhouse.com'];
-            } else {
-                let prefix = '';
-                if (stick) {
-                    const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
-                    prefix = `${hash}.sticky.`;
-                }
-                const cloud_host = `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
-
-                if (provider == 'cloud') {
-                    return [cloud_host];
-                } else {
-                    return [cloud_host, 'https://fly-selfhosted-backend-3.clickhouse.com'];
-                }
+            let prefix = '';
+            if (stick) {
+                const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
+                prefix = `${hash}.sticky.`;
             }
+            const cloud_host = `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
+            return [cloud_host];
         }
 
         class CustomError extends Error {
@@ -478,15 +424,8 @@
             return Promise.any(requests);
         }
 
-        document.querySelector('form').addEventListener('change', e => {
-            cached_tiles = {};
-            updateMap();
-        });
-
         const levels = [
-            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'planes_mercator',           sample: 1,   priority: 3 },
+            { table: 'foursquare_mercator', sample: 1, priority: 1 },
         ];
 
         /// Rendering
