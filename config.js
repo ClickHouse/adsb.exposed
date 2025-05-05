@@ -1,5 +1,6 @@
 const datasets = {
     "Planes": {
+        notice: "© adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com",
         endpoints: [
             {
                 name: "Cloud (Real-Time)",
@@ -957,6 +958,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     },
 
     "Places": {
+        notice: "© Foursquare Labs, Inc., Apache 2.0",
         endpoints: [
             {
                 name: "Cloud (Real-Time)",

@@ -17,8 +17,8 @@
             --progress-background-color3: #033;
             --progress-foreground-color3: #088;
 
-            --progress-background-color4: #333;
-            --progress-foreground-color4: #666;
+            --progress-background-color-last: #333;
+            --progress-foreground-color-last: #666;
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
@@ -352,6 +352,13 @@
             clearContainer(reports_elem);
             clearContainer(providers_elem);
 
+            for (other of datasets_elem.querySelectorAll('span')) {
+                other.classList.remove('selected');
+                if (dataset == other.innerText) {
+                    other.classList.add('selected');
+                }
+            }
+
             examples_elem.append('Examples: ');
             Object.keys(queries).forEach((example, idx) => {
                 let span = document.createElement('span');
@@ -361,7 +368,7 @@
                 }
                 span.append(document.createTextNode(example));
                 span.addEventListener('click', e => {
-                    for (other of document.querySelectorAll('#examples span')) {
+                    for (other of examples_elem.querySelectorAll('.selected')) {
                         other.classList.remove('selected');
                     }
                     e.target.classList.add('selected');
@@ -406,7 +413,7 @@
                 maxZoom: 19,
                 minNativeZoom: 2,
                 maxNativeZoom: 16,
-                attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: © adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com)'
+                attribution: `© Alexey Milovidov, ClickHouse, Inc. (data: ${config.notice})`
             };
 
             layers.forEach(layer => layer.removeFrom(map));
@@ -433,11 +440,13 @@
                 layer.on('load', e => {
                     if (idx + 1 < layers.length) {
                         layers[idx + 1].addTo(map);
+                        document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${idx + 2})`);
+                        document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${idx + 2})`);
                     } else {
+                        document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color-last`);
+                        document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color-last`);
                         document.documentElement.style.setProperty('--progress', '0');
                     }
-                    document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${idx + 2})`);
-                    document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${idx + 2})`);
                 });
             });
 
@@ -484,7 +493,7 @@
         }
 
         function updateMap() {
-            let selected_example = document.querySelector('#examples .selected');
+            let selected_example = examples_elem.querySelector('.selected');
             if (selected_example && query_elem.value != queries[selected_example.textContent]) {
                 selected_example.classList.remove('selected');
             }
@@ -636,13 +645,17 @@
 
         if (window.location.search) {
             const params = new URLSearchParams(window.location.search);
+            const params_dataset = params.get('dataset');
+            if (params_dataset && params_dataset != dataset) {
+                switchDataset(params_dataset);
+            }
             const hash = params.get('query');
             if (hash) {
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
 
-                    for (example of document.querySelectorAll('#examples span')) {
+                    for (example of examples_elem.querySelectorAll('span')) {
                         example.classList.remove('selected');
                         if (query == queries[example.innerText]) {
                             example.classList.add('selected');
@@ -1095,13 +1108,14 @@
             const query_hash = sipHash128(text);
 
             const state = {
+                dataset: dataset,
                 zoom: map.getZoom(),
                 center: map.getCenter(),
                 query: text,
                 box: selected_box,
             };
 
-            let search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
+            let search = `?dataset=${dataset}&zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
             if (selected_box.length == 2) {
                 search += `&box=${selected_box[0].lat.toFixed(4)},${selected_box[0].lng.toFixed(4)},${selected_box[1].lat.toFixed(4)},${selected_box[1].lng.toFixed(4)}`;
             }
@@ -1111,6 +1125,9 @@
         window.onpopstate = function(event) {
             const state = event.state;
             if (!state) return;
+            if (state.dataset && state.dataset != dataset) {
+                switchDataset(state.dataset);
+            }
             query_elem.value = state.query;
             map.setView(state.center, state.zoom);
             if (state.box.length == 2) {
