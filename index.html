@@ -506,6 +506,7 @@
             query_elem.value = value;
             collapseQueryEditor();
             updateMap();
+            updateHistory();
         }
 
         query_elem.addEventListener('input', expandQueryEditor);
@@ -572,7 +573,7 @@
 
         async function render(level, coords, tile) {
             const sql = query_elem.value;
-            const key = `${sql}-${coords.z}-${coords.x}-${coords.y}`;
+            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
 
             if (!cached_tiles[key]) cached_tiles[key] = [];
 
@@ -592,10 +593,17 @@
                 try {
                     const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
                     buf = await response.arrayBuffer();
+                    if (!cached_tiles[key]) cached_tiles[key] = [];
                     cached_tiles[key][level.priority] = buf;
                 } catch (error) {
-                    const response = error.errors[0].payload;
-                    const text = await response.text();
+                    let text;
+                    if (error.errors) {
+                        const response = error.errors[0].payload;
+                        text = await response.text();
+                    } else {
+                        console.log(error);
+                        text = error.toString();
+                    }
                     if (!text.includes('QUERY_WAS_CANCELLED') &&
                         !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
                         let err = document.getElementById('error');
@@ -818,7 +826,8 @@
                         let link = document.createElement('a');
                         link.textContent = link_content_func(row);
                         link.addEventListener('click', e => {
-                            let condition = `${field} = '${row[field]}'`; /// SQL injection, but ok.
+                            let sql_value = row[field].replace('\\', '\\\\').replace('\'', '\\\'');
+                            let condition = `${field} = '${sql_value}'`;
                             let changed_query = current_query.replace(
                                 /(WHERE.+?)(\/\* Filter: \*\/ AND .+)?(GROUP BY)/is,
                                 '$1' + '/* Filter: */ AND ' + condition + '\n$3');
