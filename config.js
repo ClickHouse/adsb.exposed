@@ -1,4 +1,108 @@
-let queries = {
+const datasets = {
+    "Planes": {
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+            {
+                name: "Self-hosted (Snapshot)",
+                urls: [
+                    {
+                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
+                    }
+                ]
+            },
+            {
+                name: "Any",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    },
+                    {
+                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'planes_mercator',           sample: 1,   priority: 3 },
+        ],
+        reports: [
+            {
+                query: `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT aircraft_flight, count() AS c
+                    FROM {table:Identifier}
+                    WHERE aircraft_flight != '' AND NOT startsWith(aircraft_flight, '@@@') AND ${condition}
+                    GROUP BY aircraft_flight
+                    ORDER BY c DESC
+                    LIMIT 100`,
+                field: 'aircraft_flight',
+                id: 'report_flights',
+                title: 'Flights: ',
+                separator: ', ',
+                content: (row => row.aircraft_flight)
+            },
+            {
+                query: `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT t, anyIf(desc, desc != '') AS desc, count() AS c
+                    FROM {table:Identifier}
+                    WHERE t != '' AND ${condition}
+                    GROUP BY t
+                    ORDER BY c DESC
+                    LIMIT 100`,
+                field: 't',
+                id: 'report_types',
+                title: 'Types:\n',
+                separator: ',\n',
+                content: (row => `${row.t} (${row.desc})`)
+            },
+            {
+                query: `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT r, count() AS c
+                    FROM {table:Identifier}
+                    WHERE r != '' AND ${condition}
+                    GROUP BY r
+                    ORDER BY c DESC
+                    LIMIT 100`,
+                field: 'r',
+                id: 'report_regs',
+                title: 'Registration: ',
+                separator: ', ',
+                content: (row => row.r)
+            },
+            {
+                query: `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT ownOp, count() AS c
+                    FROM {table:Identifier}
+                    WHERE ownOp != '' AND ${condition}
+                    GROUP BY ownOp
+                    ORDER BY c DESC
+                    LIMIT 100`,
+                field: 'ownOp',
+                id: 'report_owners',
+                title: 'Owner:\n',
+                separator: ',\n',
+                content: (row => row.ownOp)
+            },
+        ],
+        queries: {
 "Altitude & Velocity": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -821,4 +925,6 @@ SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha):
 FROM {table:Identifier}
 WHERE in_tile AND aircraft_flight != ''
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    }
 };

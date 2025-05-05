@@ -332,9 +332,13 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script src="examples.js"></script>
+    <script src="config.js"></script>
     <script>
         let uuid = crypto.randomUUID();
+
+        const dataset = "Planes";
+        const config = datasets[dataset];
+        const queries = config.queries;
 
         let examples_elem = document.getElementById('examples');
 
@@ -678,59 +682,6 @@
             /// This is fairly dirty.
             const condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
 
-            const sql_total = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT
-                    count() AS traces,
-                    uniq(r) AS aircrafts,
-                    uniq(t) AS types,
-                    uniqIf(aircraft_flight,
-                    aircraft_flight != '') AS flights,
-                    min(time) AS first, max(time) AS last
-                FROM {table:Identifier}
-                WHERE ${condition}`;
-
-            const sql_flights = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT aircraft_flight, count() AS c
-                FROM {table:Identifier}
-                WHERE aircraft_flight != '' AND NOT startsWith(aircraft_flight, '@@@') AND ${condition}
-                GROUP BY aircraft_flight
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_types = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT t, anyIf(desc, desc != '') AS desc, count() AS c
-                FROM {table:Identifier}
-                WHERE t != '' AND ${condition}
-                GROUP BY t
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_registration = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT r, count() AS c
-                FROM {table:Identifier}
-                WHERE r != '' AND ${condition}
-                GROUP BY r
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_owner = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT ownOp, count() AS c
-                FROM {table:Identifier}
-                WHERE ownOp != '' AND ${condition}
-                GROUP BY ownOp
-                ORDER BY c DESC
-                LIMIT 100`;
-
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
@@ -869,13 +820,6 @@
                 });
             }
 
-            const reports = [
-                { query: sql_flights, field: 'aircraft_flight', id: 'report_flights', title: 'Flights: ', separator: ', ', content: (row => row.aircraft_flight) },
-                { query: sql_types, field: 't', id: 'report_types', title: 'Types:\n', separator: ',\n', content: (row => `${row.t} (${row.desc})`) },
-                { query: sql_registration, field: 'r', id: 'report_regs', title: 'Registration: ', separator: ', ', content: (row => row.r) },
-                { query: sql_owner, field: 'ownOp', id: 'report_owners', title: 'Owner:\n', separator: ',\n', content: (row => row.ownOp) },
-           ];
-
             calculateReport(sql_total).then(json => {
                 const row = json.data[0];
 
@@ -892,7 +836,7 @@
                 }
             });
 
-            reports.forEach(report => {
+            config.reports.forEach(report => {
                 createList(report.query, report.field, report.id, report.title, report.separator, report.content);
             });
         }
