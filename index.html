@@ -662,6 +662,7 @@
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+                    updateMap();
 
                     for (example of examples_elem.querySelectorAll('span')) {
                         example.classList.remove('selected');
