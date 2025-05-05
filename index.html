@@ -17,8 +17,8 @@
             --progress-background-color3: #033;
             --progress-foreground-color3: #088;
 
-            --progress-background-color4: #333;
-            --progress-foreground-color4: #666;
+            --progress-background-color-last: #333;
+            --progress-foreground-color-last: #666;
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
@@ -40,7 +40,7 @@
         body {
             display: grid;
             grid-template-columns: auto var(--report-width);
-            grid-template-rows: fit-content(2em) fit-content(10%) fit-content(2em) 1em auto;
+            grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) 1em auto;
             grid-gap: 0;
         }
 
@@ -144,7 +144,7 @@
             text-align: right;
         }
 
-        #examples {
+        .choices {
             grid-column: span 2;
             background: #202020;
             color: white;
@@ -153,7 +153,7 @@
             padding: .125em .5em;
         }
 
-        #examples span {
+        .choices span {
             display: inline-block;
             padding: .25em .5em;
             background: #444;
@@ -161,13 +161,13 @@
             user-select: none;
         }
 
-        #examples span:hover, #examples span.selected:hover {
+        .choices span:hover, .choices span.selected:hover {
             color: black;
             background: yellow;
             cursor: pointer;
         }
 
-        #examples span.selected {
+        .choices span.selected {
             background: #FFF;
             color: #000;
         }
@@ -295,55 +295,164 @@
 
 <body>
     <a id="proud" href="https://github.com/ClickHouse/ClickHouse">Proudly made with <b>ClickHouse</b> open-source database</a>
+    <div id="datasets" class="choices"></div>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
-    <div id="examples">Examples:&nbsp;</div>
+    <div id="examples" class="choices"></div>
     <div id="stats"></div>
     <div id="map"><div id="selection"></div></div>
-    <div id="report">
-        <div id="report_total"></div>
-        <div id="report_time"></div>
-        <div id="report_types"></div>
-        <div id="report_flights"></div>
-        <div id="report_owners"></div>
-        <div id="report_regs"></div>
-    </div>
+    <div id="report"></div>
     <div id="picture"><img/><span id="picture-copyright">Picture from Wikipedia, &copy; the details at the corresponding page.</span></div>
     <div id="error"></div>
     <div id="layers">👁</div>
     <div id="select"><img src="pointer.svg"/></div>
 
-    <div id="provider">
-        <form>
-            <label>
-                <input type="radio" name="provider" value="any" checked>
-                Any
-            </label>
-            <br/>
-            <label>
-                <input type="radio" name="provider" value="cloud">
-                Cloud (Real-Time)
-            </label>
-            <br/>
-            <label>
-                <input type="radio" name="provider" value="self-hosted-intel">
-                Self-hosted (Snapshot)
-            </label>
-        </form>
-    </div>
+    <div id="provider"></div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-    <script src="examples.js"></script>
+    <script src="config.js"></script>
     <script>
         let uuid = crypto.randomUUID();
 
-        let examples_elem = document.getElementById('examples');
+        let dataset;
+        let config;
+        let queries;
+        let levels;
 
-        Object.keys(queries).forEach((example, idx) => {
+        let datasets_elem = document.getElementById('datasets');
+        let examples_elem = document.getElementById('examples');
+        let reports_elem = document.getElementById('report');
+        let providers_elem = document.getElementById('provider');
+
+        datasets_elem.append('Datasets: ');
+        Object.keys(datasets).forEach((dataset_name, idx) => {
             let span = document.createElement('span');
             if (!idx) { span.className = 'selected'; }
-            span.append(document.createTextNode(example));
-            examples_elem.append(span);
+            span.append(document.createTextNode(dataset_name));
+            span.addEventListener('click', e => {
+                for (other of document.querySelectorAll('#datasets span')) {
+                    other.classList.remove('selected');
+                }
+                e.target.classList.add('selected');
+                switchDataset(dataset_name);
+            });
+            datasets_elem.append(span);
         });
+
+        function clearContainer(elem) {
+            while (elem.firstChild) elem.removeChild(elem.firstChild);
+        }
+
+        function switchDataset(name) {
+            dataset = name;
+            config = datasets[dataset];
+            queries = config.queries;
+            levels = config.levels;
+
+            clearContainer(examples_elem);
+            clearContainer(reports_elem);
+            clearContainer(providers_elem);
+
+            for (other of datasets_elem.querySelectorAll('span')) {
+                other.classList.remove('selected');
+                if (dataset == other.innerText) {
+                    other.classList.add('selected');
+                }
+            }
+
+            examples_elem.append('Examples: ');
+            Object.keys(queries).forEach((example, idx) => {
+                let span = document.createElement('span');
+                if (!idx) {
+                    span.className = 'selected';
+                    query_elem.value = queries[example];
+                }
+                span.append(document.createTextNode(example));
+                span.addEventListener('click', e => {
+                    for (other of examples_elem.querySelectorAll('.selected')) {
+                        other.classList.remove('selected');
+                    }
+                    e.target.classList.add('selected');
+                    setQuery(queries[example]);
+                });
+                examples_elem.append(span);
+            });
+
+            const report_total = document.createElement('div');
+            report_total.id = 'report_total';
+            reports_elem.append(report_total);
+
+            config.reports.forEach(report => {
+                let elem = document.createElement('div');
+                elem.id = report.id;
+                reports_elem.append(elem);
+            });
+
+            let form = document.createElement('form');
+            config.endpoints.forEach((endpoint, idx) => {
+                let label = document.createElement('label');
+                let input = document.createElement('input');
+                input.type = 'radio';
+                input.name = 'provider';
+                input.value = endpoint.name;
+                if (!idx) { input.checked = true; } else { form.append(document.createElement('br')); }
+                label.append(input);
+                label.append(` ${endpoint.name}`);
+                form.append(label);
+            });
+            form.addEventListener('change', e => {
+                cached_tiles = {};
+                updateMap();
+            });
+
+            providers_elem.append(form);
+            providers_elem.style.display = config.endpoints.length > 1 ? 'block' : 'none';
+
+            const layer_options = {
+                tileSize: 1024,
+                minZoom: 2,
+                maxZoom: 19,
+                minNativeZoom: 2,
+                maxNativeZoom: 16,
+                attribution: `© Alexey Milovidov, ClickHouse, Inc. (data: ${config.notice})`
+            };
+
+            layers.forEach(layer => layer.removeFrom(map));
+            layers = [];
+
+            levels.forEach((level, idx) => {
+                let options = layer_options;
+                options.level = level;
+                layers.push(new L.GridLayer.ClickHouse(options));
+            });
+
+            layers[0].addTo(map);
+            layers[0].on('loading', e => {
+                layers.forEach((layer, idx) => {
+                    if (idx) { layer.removeFrom(map); }
+                });
+                document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
+                document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
+            });
+
+            /// Sequential loading for different levels of details
+
+            layers.forEach((layer, idx) => {
+                layer.on('load', e => {
+                    if (idx + 1 < layers.length) {
+                        layers[idx + 1].addTo(map);
+                        document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${idx + 2})`);
+                        document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${idx + 2})`);
+                    } else {
+                        document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color-last`);
+                        document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color-last`);
+                        document.documentElement.style.setProperty('--progress', '0');
+                    }
+                });
+            });
+
+            cached_tiles = {};
+            updateMap();
+        }
 
         let base_layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
             zoomOffset: 0,
@@ -384,7 +493,7 @@
         }
 
         function updateMap() {
-            let selected_example = document.querySelector('#examples .selected');
+            let selected_example = examples_elem.querySelector('.selected');
             if (selected_example && query_elem.value != queries[selected_example.textContent]) {
                 selected_example.classList.remove('selected');
             }
@@ -397,20 +506,7 @@
             query_elem.value = value;
             collapseQueryEditor();
             updateMap();
-        }
-
-        function selectExample(elem) {
-            for (other of document.querySelectorAll('#examples span')) {
-                other.classList.remove('selected');
-            }
-            elem.classList.add('selected');
-        }
-
-        for (elem of document.querySelectorAll('#examples span')) {
-            elem.addEventListener('click', e => {
-                selectExample(e.target);
-                setQuery(queries[e.target.textContent]);
-            });
+            updateHistory();
         }
 
         query_elem.addEventListener('input', expandQueryEditor);
@@ -427,24 +523,16 @@
         });
 
         function getHosts(stick) {
-            const provider = document.querySelector('input[name="provider"]:checked').value;
+            const provider = providers_elem.querySelector('input[name="provider"]:checked').value;
 
-            if (provider == 'self-hosted-intel') {
-                return ['https://fly-selfhosted-backend-3.clickhouse.com'];
-            } else {
-                let prefix = '';
-                if (stick) {
+            return config.endpoints.find(endpoint => endpoint.name == provider).urls.map(url => {
+                if (stick && url.sticky) {
                     const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
-                    prefix = `${hash}.sticky.`;
-                }
-                const cloud_host = `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com`;
-
-                if (provider == 'cloud') {
-                    return [cloud_host];
+                    return url.sticky.replace('{hash}', hash);
                 } else {
-                    return [cloud_host, 'https://fly-selfhosted-backend-3.clickhouse.com'];
+                    return url.url;
                 }
-            }
+            });
         }
 
         class CustomError extends Error {
@@ -478,17 +566,6 @@
             return Promise.any(requests);
         }
 
-        document.querySelector('form').addEventListener('change', e => {
-            cached_tiles = {};
-            updateMap();
-        });
-
-        const levels = [
-            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'planes_mercator',           sample: 1,   priority: 3 },
-        ];
-
         /// Rendering
 
         let progress_update_period = null;
@@ -496,7 +573,7 @@
 
         async function render(level, coords, tile) {
             const sql = query_elem.value;
-            const key = `${sql}-${coords.z}-${coords.x}-${coords.y}`;
+            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
 
             if (!cached_tiles[key]) cached_tiles[key] = [];
 
@@ -516,10 +593,17 @@
                 try {
                     const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
                     buf = await response.arrayBuffer();
+                    if (!cached_tiles[key]) cached_tiles[key] = [];
                     cached_tiles[key][level.priority] = buf;
                 } catch (error) {
-                    const response = error.errors[0].payload;
-                    const text = await response.text();
+                    let text;
+                    if (error.errors) {
+                        const response = error.errors[0].payload;
+                        text = await response.text();
+                    } else {
+                        console.log(error);
+                        text = error.toString();
+                    }
                     if (!text.includes('QUERY_WAS_CANCELLED') &&
                         !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
                         let err = document.getElementById('error');
@@ -552,7 +636,7 @@
             }
         });
 
-        setQuery(queries[document.querySelector('#examples .selected').textContent]);
+        switchDataset('Planes');
 
         /// Restore from a saved link
 
@@ -569,13 +653,17 @@
 
         if (window.location.search) {
             const params = new URLSearchParams(window.location.search);
+            const params_dataset = params.get('dataset');
+            if (params_dataset && params_dataset != dataset) {
+                switchDataset(params_dataset);
+            }
             const hash = params.get('query');
             if (hash) {
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
 
-                    for (example of document.querySelectorAll('#examples span')) {
+                    for (example of examples_elem.querySelectorAll('span')) {
                         example.classList.remove('selected');
                         if (query == queries[example.innerText]) {
                             example.classList.add('selected');
@@ -598,44 +686,6 @@
                 });
             }
         }
-
-        const layer_options = {
-            tileSize: 1024,
-            minZoom: 2,
-            maxZoom: 19,
-            minNativeZoom: 2,
-            maxNativeZoom: 16,
-            attribution: '© Alexey Milovidov, ClickHouse, Inc. (data: © adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com)'
-        };
-
-        levels.forEach((level, idx) => {
-            let options = layer_options;
-            options.level = level;
-            layers.push(new L.GridLayer.ClickHouse(options));
-        });
-
-        layers[0].addTo(map);
-        layers[0].on('loading', e => {
-            layers.forEach((layer, idx) => {
-                if (idx) { layer.removeFrom(map); }
-            });
-            document.documentElement.style.setProperty('--progress-background-color', 'var(--progress-background-color1)');
-            document.documentElement.style.setProperty('--progress-foreground-color', 'var(--progress-foreground-color1)');
-        });
-
-        /// Sequential loading for different levels of details
-
-        layers.forEach((layer, idx) => {
-            layer.on('load', e => {
-                if (idx + 1 < layers.length) {
-                    layers[idx + 1].addTo(map);
-                } else {
-                    document.documentElement.style.setProperty('--progress', '0');
-                }
-                document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${idx + 2})`);
-                document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${idx + 2})`);
-            });
-        });
 
         /// Rectangle selection and reports
 
@@ -661,10 +711,6 @@
         let selection_origin_point = {x: 0, y: 0};
         let selection = document.getElementById('selection');
 
-        function clearContainer(elem) {
-            while (elem.firstChild) elem.removeChild(elem.firstChild);
-        }
-
         function showReport() {
             ++report_sequence_num;
             const current_report_sequence_num = report_sequence_num;
@@ -677,59 +723,6 @@
 
             /// This is fairly dirty.
             const condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
-
-            const sql_total = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT
-                    count() AS traces,
-                    uniq(r) AS aircrafts,
-                    uniq(t) AS types,
-                    uniqIf(aircraft_flight,
-                    aircraft_flight != '') AS flights,
-                    min(time) AS first, max(time) AS last
-                FROM {table:Identifier}
-                WHERE ${condition}`;
-
-            const sql_flights = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT aircraft_flight, count() AS c
-                FROM {table:Identifier}
-                WHERE aircraft_flight != '' AND NOT startsWith(aircraft_flight, '@@@') AND ${condition}
-                GROUP BY aircraft_flight
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_types = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT t, anyIf(desc, desc != '') AS desc, count() AS c
-                FROM {table:Identifier}
-                WHERE t != '' AND ${condition}
-                GROUP BY t
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_registration = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT r, count() AS c
-                FROM {table:Identifier}
-                WHERE r != '' AND ${condition}
-                GROUP BY r
-                ORDER BY c DESC
-                LIMIT 100`;
-
-            const sql_owner = `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT ownOp, count() AS c
-                FROM {table:Identifier}
-                WHERE ownOp != '' AND ${condition}
-                GROUP BY ownOp
-                ORDER BY c DESC
-                LIMIT 100`;
 
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
@@ -833,7 +826,8 @@
                         let link = document.createElement('a');
                         link.textContent = link_content_func(row);
                         link.addEventListener('click', e => {
-                            let condition = `${field} = '${row[field]}'`; /// SQL injection, but ok.
+                            let sql_value = row[field].replace('\\', '\\\\').replace('\'', '\\\'');
+                            let condition = `${field} = '${sql_value}'`;
                             let changed_query = current_query.replace(
                                 /(WHERE.+?)(\/\* Filter: \*\/ AND .+)?(GROUP BY)/is,
                                 '$1' + '/* Filter: */ AND ' + condition + '\n$3');
@@ -869,31 +863,12 @@
                 });
             }
 
-            const reports = [
-                { query: sql_flights, field: 'aircraft_flight', id: 'report_flights', title: 'Flights: ', separator: ', ', content: (row => row.aircraft_flight) },
-                { query: sql_types, field: 't', id: 'report_types', title: 'Types:\n', separator: ',\n', content: (row => `${row.t} (${row.desc})`) },
-                { query: sql_registration, field: 'r', id: 'report_regs', title: 'Registration: ', separator: ', ', content: (row => row.r) },
-                { query: sql_owner, field: 'ownOp', id: 'report_owners', title: 'Owner:\n', separator: ',\n', content: (row => row.ownOp) },
-           ];
-
-            calculateReport(sql_total).then(json => {
-                const row = json.data[0];
-
-                let text = `Total ${Number(row.traces).toLocaleString()} traces, ${Number(row.aircrafts).toLocaleString()} aircrafts of ${Number(row.types).toLocaleString()} types, ${Number(row.aircrafts).toLocaleString()} flight nums.`;
-
-                if (json.statistics.rows_read > 1) {
-                    text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
-                }
-
-                document.getElementById('report_total').textContent = text;
-
-                if (row.traces > 0) {
-                    document.getElementById('report_time').textContent = `Time: ${row.first} — ${row.last}`;
-                }
+            calculateReport(config.report_total.query(condition)).then(json => {
+                document.getElementById('report_total').textContent = config.report_total.content(json);
             });
 
-            reports.forEach(report => {
-                createList(report.query, report.field, report.id, report.title, report.separator, report.content);
+            config.reports.forEach(report => {
+                createList(report.query(condition), report.field, report.id, report.title, report.separator, report.content);
             });
         }
 
@@ -1142,13 +1117,14 @@
             const query_hash = sipHash128(text);
 
             const state = {
+                dataset: dataset,
                 zoom: map.getZoom(),
                 center: map.getCenter(),
                 query: text,
                 box: selected_box,
             };
 
-            let search = `?zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
+            let search = `?dataset=${dataset}&zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
             if (selected_box.length == 2) {
                 search += `&box=${selected_box[0].lat.toFixed(4)},${selected_box[0].lng.toFixed(4)},${selected_box[1].lat.toFixed(4)},${selected_box[1].lng.toFixed(4)}`;
             }
@@ -1158,6 +1134,9 @@
         window.onpopstate = function(event) {
             const state = event.state;
             if (!state) return;
+            if (state.dataset && state.dataset != dataset) {
+                switchDataset(state.dataset);
+            }
             query_elem.value = state.query;
             map.setView(state.center, state.zoom);
             if (state.box.length == 2) {
