@@ -3,6 +3,18 @@ const datasets = {
         notice: "© adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com",
         endpoints: [
             {
+                name: "Any",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    },
+                    {
+                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
+                    }
+                ]
+            },
+            {
                 name: "Cloud (Real-Time)",
                 urls: [
                     {
@@ -14,18 +26,6 @@ const datasets = {
             {
                 name: "Self-hosted (Snapshot)",
                 urls: [
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
-            {
-                name: "Any",
-                urls: [
-                    {
-                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                    },
                     {
                         url: "https://fly-selfhosted-backend-3.clickhouse.com",
                     }
@@ -961,6 +961,18 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         notice: "© Foursquare Labs, Inc., Apache 2.0",
         endpoints: [
             {
+                name: "Any",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    },
+                    {
+                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
+                    }
+                ]
+            },
+            {
                 name: "Cloud (Real-Time)",
                 urls: [
                     {
@@ -972,18 +984,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             {
                 name: "Self-hosted (Snapshot)",
                 urls: [
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
-            {
-                name: "Any",
-                urls: [
-                    {
-                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                    },
                     {
                         url: "https://fly-selfhosted-backend-3.clickhouse.com",
                     }
