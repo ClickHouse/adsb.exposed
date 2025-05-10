@@ -796,7 +796,7 @@
                         const image_info_response = await fetch(image_info_url);
                         const image_info_data = await image_info_response.json();
 
-                        const metadata = image_info_data.query.pages["-1"].imageinfo[0].extmetadata;
+                        const metadata = Object.values(image_info_data.query.pages)[0].imageinfo[0].extmetadata;
                         const attribution = `${metadata.LicenseShortName.value}, ${metadata.Artist.value}`;
 
                         return {src: pages[page_id].thumbnail.source.replace(/\/\d+px/, '/500px'), attr: attribution};
