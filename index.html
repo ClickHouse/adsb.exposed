@@ -812,7 +812,7 @@
                 return result;
             }
 
-            function createList(sql, field, elem_id, title, separator, link_content_func) {
+            function createList(sql, field, elem_id, title, separator, link_content_func, wiki_field) {
                 calculateReport(sql, field).then(json => {
                     if (current_report_sequence_num != report_sequence_num) return;
 
@@ -837,9 +837,9 @@
                         });
 
                         /// Pictures from Wikipedia
-                        if (field == 't') {
+                        if (wiki_field) {
                             link.addEventListener('mouseover', e => {
-                                findPictureCached(row.desc).then(data => {
+                                findPictureCached(row[wiki_field]).then(data => {
                                     if (data) {
                                         let picture = document.getElementById('picture');
                                         picture.style.display = 'block';
@@ -869,7 +869,7 @@
             });
 
             config.reports.forEach(report => {
-                createList(report.query(condition), report.field, report.id, report.title, report.separator, report.content);
+                createList(report.query(condition), report.field, report.id, report.title, report.separator, report.content, report.wiki_field ?? null);
             });
         }
 

@@ -93,6 +93,7 @@ const datasets = {
                     ORDER BY c DESC
                     LIMIT 100`),
                 field: 't',
+                wiki_field: 'desc',
                 id: 'report_types',
                 title: 'Types:\n',
                 separator: ',\n',
@@ -1320,6 +1321,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     ORDER BY c DESC
                     LIMIT 100`),
                 field: 'vernacularname',
+                wiki_field: 'vernacularname',
                 id: 'report_names',
                 title: 'Name: ',
                 separator: ', ',
@@ -1336,6 +1338,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     ORDER BY c DESC
                     LIMIT 100`),
                 field: 'order',
+                wiki_field: 'order',
                 id: 'report_orders',
                 title: 'Order: ',
                 separator: ', ',
@@ -1352,6 +1355,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     ORDER BY c DESC
                     LIMIT 100`),
                 field: 'family',
+                wiki_field: 'family',
                 id: 'report_families',
                 title: 'Family: ',
                 separator: ', ',
