@@ -1258,31 +1258,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         notice: "© Cornell Lab of Ornithology. eBird Observation Dataset. CC BY 4.0",
         endpoints: [
             {
-                name: "Any",
-                urls: [
-                    {
-                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                    },
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
-            {
                 name: "Cloud (Real-Time)",
                 urls: [
                     {
                         url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
                         sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                    }
-                ]
-            },
-            {
-                name: "Self-hosted (Snapshot)",
-                urls: [
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
                     }
                 ]
             },
