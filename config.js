@@ -1613,6 +1613,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         levels: [
             { table: 'stats', sample: 1, priority: 1 },
         ],
+        disable_cache: true,
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -1666,8 +1667,7 @@ color3 * 255 AS blue
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
 WHERE in_tile
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024
-SETTINGS use_query_cache = 0`,
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         },
     },
 };
