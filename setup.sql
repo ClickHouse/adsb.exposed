@@ -155,3 +155,33 @@ FOR RANDOMIZED INTERVAL 1 DAY MAX query_selects = 5000, query_inserts = 50000, w
 TO website_saved_queries;
 
 GRANT SELECT, INSERT ON default.saved_queries TO website_saved_queries;
+
+
+CREATE TABLE stats
+(
+    time MATERIALIZED now(),
+    mercator_x UInt32,
+    mercator_y UInt32,
+    zoom UInt8,
+    start_time DateTime64(3),
+    time_offset_ms UInt64,
+    uuid UUID,
+
+    INDEX idx_x (mercator_x) TYPE minmax,
+    INDEX idx_y (mercator_y) TYPE minmax
+) ORDER BY (mortonEncode(mercator_x, mercator_y), time);
+
+CREATE USER website_stats IDENTIFIED WITH sha256_hash BY 'E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855'
+SETTINGS
+    add_http_cors_header = 1 READONLY,
+    date_time_input_format = 'best_effort' READONLY;
+
+CREATE QUOTA website_stats
+KEYED BY ip_address
+FOR RANDOMIZED INTERVAL 1 MINUTE MAX query_inserts = 100, written_bytes = '10M',
+FOR RANDOMIZED INTERVAL 1 HOUR MAX query_inserts = 5000, written_bytes = '50M',
+FOR RANDOMIZED INTERVAL 1 DAY MAX query_inserts = 50000, written_bytes = '200M'
+TO website_stats;
+
+GRANT INSERT ON default.stats TO website_stats;
+GRANT SELECT ON default.stats TO website;

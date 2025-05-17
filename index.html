@@ -918,11 +918,13 @@
         map_elem.addEventListener('touchstart', e => e.preventDefault());
 
         function selectMove(e) {
-            if (!selecting) return;
-
             const rect = map_elem.getBoundingClientRect();
             const x = e.clientX - rect.x;
             const y = e.clientY - rect.y;
+            const box = latlngToMercator(map.containerPointToLatLng([x, y]));
+            addStats(box.x, box.y, map.getZoom());
+
+            if (!selecting) return;
 
             if (x >= selection_origin_point.x) {
                 selection.style.width = Math.round(x - selection_origin_point.x) + 'px';
@@ -1095,6 +1097,30 @@
             const data = await response.json();
             return data.data[0].text;
         }
+
+        /// Usage statistics
+
+        let stats = [];
+        let start_time = new Date;
+
+        function addStats(x, y, z) {
+            const time_offset_ms = (new Date) - start_time;
+            stats.push([x, y, z, start_time.toISOString(), time_offset_ms, uuid]);
+        }
+
+        async function sendStats() {
+            if (stats.length == 0) return;
+
+            const current_stats = stats;
+            stats = [];
+
+            const sql = `INSERT INTO stats (mercator_x, mercator_y, zoom, start_time, time_offset_ms, uuid) FORMAT JSONCompactEachRow`;
+            const hosts = getHosts(null);
+            const url = host => `${host}/?user=website_stats&query=${encodeURIComponent(sql)}`;
+            const response = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: JSON.stringify(current_stats).slice(1, -1) })));
+        }
+
+        setInterval(sendStats, 1000);
 
         /// Layers visibility toggle
 

@@ -1596,4 +1596,77 @@ WHERE in_tile
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         },
     },
+
+    "You": {
+        notice: "this website",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'stats', sample: 1, priority: 1 },
+        ],
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT
+                    count() AS traces
+                FROM {table:Identifier}
+                WHERE ${condition}`),
+            content: (json => {
+                let row = json.data[0];
+                let text = `Total ${Number(row.traces).toLocaleString()} traces.`;
+
+                if (json.statistics.rows_read > 1) {
+                    text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                }
+
+                return text;
+            }),
+        },
+        reports: [],
+        queries: {
+            "Density": `WITH
+bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+tile_size * {x:UInt16} AS tile_x_begin,
+tile_size * ({x:UInt16} + 1) AS tile_x_end,
+
+tile_size * {y:UInt16} AS tile_y_begin,
+tile_size * ({y:UInt16} + 1) AS tile_y_end,
+
+mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+y * 1024 + x AS pos,
+
+count() AS total,
+
+pow(least(1, total / 100 * zoom_factor), 1/5) AS color1,
+pow(least(1, total / 10000 * zoom_factor), 1/5) AS color2,
+pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color3,
+
+255 AS alpha,
+color1 * 255 AS red,
+color2 * 255 AS green,
+color3 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+        },
+    },
 };
