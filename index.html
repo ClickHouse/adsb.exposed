@@ -576,15 +576,18 @@
             const sql = query_elem.value;
             const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
 
-            if (!cached_tiles[key]) cached_tiles[key] = [];
-
-            buf = cached_tiles[key][level.priority];
+            let buf;
+            if (!config.disable_cache) {
+                if (!cached_tiles[key]) cached_tiles[key] = [];
+                buf = cached_tiles[key][level.priority];
+            }
 
             if (!buf) {
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
                 const hosts = getHosts(key);
                 const url = host => `${host}/?user=website&default_format=RowBinary` +
+                    (config.disable_cache ? '&use_query_cache=0' : '') +
                     `&query_id=${query_id}&replace_running_query=1` +
                     `&param_table=${level.table}&param_sampling=${level.sample}` +
                     `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
@@ -594,8 +597,10 @@
                 try {
                     const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
                     buf = await response.arrayBuffer();
-                    if (!cached_tiles[key]) cached_tiles[key] = [];
-                    cached_tiles[key][level.priority] = buf;
+                    if (!config.disable_cache) {
+                        if (!cached_tiles[key]) cached_tiles[key] = [];
+                        cached_tiles[key][level.priority] = buf;
+                    }
                 } catch (error) {
                     let text;
                     if (error.errors) {
