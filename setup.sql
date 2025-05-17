@@ -90,7 +90,7 @@ SETTINGS
     replace_running_query = 1,
     skip_unavailable_shards = 1,
     max_parallel_replicas = 100,
-    use_query_cache = 1,
+    use_query_cache = 1 CHANGEABLE_IN_READONLY,
     query_cache_ttl = 8640000,
     query_cache_share_between_users = 1,
     analyze_index_with_space_filling_curves = 0,
