@@ -1656,13 +1656,13 @@ y * 1024 + x AS pos,
 count() AS total,
 
 pow(least(1, total / 100 * zoom_factor), 1/5) AS color1,
-pow(least(1, total / 10000 * zoom_factor), 1/5) AS color2,
-pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color3,
+avg(least(greatest(0, zoom - 3), 6) / 6) AS color2,
+avg(least(1, greatest(0, zoom - 6) / 6)) AS color3,
 
 255 AS alpha,
-color1 * 255 AS red,
-color2 * 255 AS green,
-color3 * 255 AS blue
+(1 - greatest(color2, color3)) * 255 AS blue,
+least(1, color2 + color3) * 255 AS red,
+(color3) * 255 AS green
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
