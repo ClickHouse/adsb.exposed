@@ -378,6 +378,27 @@
                 examples_elem.append(span);
             });
 
+            if (photos_layer_active) {
+                photos_layer.removeFrom(map);
+                photos_layer_active = false;
+            }
+
+            if (name == 'Photos') {
+                let span = document.createElement('span');
+                span.append(document.createTextNode('🖼️'));
+                span.addEventListener('click', e => {
+                    e.target.classList.toggle('selected');
+                    if (e.target.classList.contains('selected')) {
+                        photos_layer.addTo(map);
+                        photos_layer_active = true;
+                    } else {
+                        photos_layer.removeFrom(map);
+                        photos_layer_active = false;
+                    }
+                });
+                examples_elem.append(span);
+            }
+
             const report_total = document.createElement('div');
             report_total.id = 'report_total';
             reports_elem.append(report_total);
@@ -500,6 +521,9 @@
             }
 
             layers[0]?.redraw();
+            if (photos_layer_active) {
+                photos_layer.redraw();
+            }
             if (selected_box.length == 2) showReport();
         }
 
@@ -640,6 +664,87 @@
                 render(this.options.level, coords, tile).then(err => done(err, tile));
                 return tile;
             }
+        });
+
+        /// Special layer made of photos.
+        async function getTopPhoto(coords) {
+            /// This is fairly dirty.
+            const condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+
+            const sql = `WITH
+                bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+                tile_size * {x:UInt32} AS tile_x_begin,
+                tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+                tile_size * {y:UInt32} AS tile_y_begin,
+                tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+                mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+                AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile
+
+                SELECT url_sq AS src
+                FROM flickr_mercator
+                WHERE ${condition} AND has(sizes, 'k')
+                ORDER BY count_faves DESC, count_views DESC
+                LIMIT 1`;
+
+            ++query_sequence_num;
+            const query_id = `${uuid}-${query_sequence_num}-flickr_mercator_top-${coords.z + 2}-${coords.x}-${coords.y}`;
+            const hosts = getHosts(`${coords.z}-${coords.x}-${coords.y}`);
+            const url = host => `${host}/?user=website&default_format=JSON` +
+                `&query_id=${query_id}&replace_running_query=1` +
+                `&param_z=${coords.z + 2}&param_x=${coords.x}&param_y=${coords.y}`;
+
+            progress_update_period = 1;
+
+            try {
+                const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
+                const json = await response.json();
+                if (json.data.length == 1) {
+                    return json.data[0].src;
+                }
+            } catch (error) {
+                let text;
+                if (error.errors) {
+                    const response = error.errors[0].payload;
+                    text = await response.text();
+                } else {
+                    console.log(error);
+                    text = error.toString();
+                }
+                if (!text.includes('QUERY_WAS_CANCELLED') &&
+                    !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
+                    let err = document.getElementById('error');
+                    err.textContent = text;
+                    err.style.display = 'block';
+                }
+            }
+        }
+
+        L.GridLayer.Photos = L.GridLayer.extend({
+            createTile: function(coords, done) {
+                let tile = L.DomUtil.create('img', 'leaflet-tile');
+                tile.width = 64;
+                tile.height = 64;
+                getTopPhoto(coords).then(src => {
+                    if (src) {
+                        tile.src = src; tile.onload = () => done(null, tile);
+                    } else {
+                        done(null, tile);
+                    }
+                });
+                return tile;
+            }
+        });
+
+        let photos_layer_active = false;
+        let photos_layer = new L.GridLayer.Photos({
+            tileSize: 64,
+            minZoom: 2,
+            maxZoom: 19,
+            minNativeZoom: 2,
+            maxNativeZoom: 19,
         });
 
         switchDataset('Planes');
