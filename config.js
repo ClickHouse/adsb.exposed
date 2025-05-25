@@ -137,11 +137,11 @@ const datasets = {
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -173,11 +173,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -213,11 +213,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -249,11 +249,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -283,11 +283,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -318,11 +318,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -346,11 +346,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -374,11 +374,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -407,11 +407,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -443,11 +443,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -474,11 +474,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -509,11 +509,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -545,11 +545,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -580,11 +580,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -615,11 +615,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -650,11 +650,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -684,11 +684,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -722,11 +722,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -753,11 +753,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -789,11 +789,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -825,11 +825,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -857,11 +857,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -892,11 +892,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -926,11 +926,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1052,11 +1052,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1086,11 +1086,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1119,11 +1119,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1155,11 +1155,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1189,11 +1189,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1222,11 +1222,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-    tile_size * {x:UInt16} AS tile_x_begin,
-    tile_size * ({x:UInt16} + 1) AS tile_x_end,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-    tile_size * {y:UInt16} AS tile_y_begin,
-    tile_size * ({y:UInt16} + 1) AS tile_y_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1347,11 +1347,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1381,11 +1381,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1419,11 +1419,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1457,11 +1457,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1495,11 +1495,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1533,11 +1533,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1571,11 +1571,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1598,7 +1598,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     },
 
     "Photos": {
-        notice: "Flickr",
+        notice: "ODC-By v1.0, https://huggingface.co/datasets/bigdata-pw/Flickr",
         endpoints: [
             {
                 name: "Cloud (Real-Time)",
@@ -1670,11 +1670,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1704,11 +1704,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
@@ -1779,11 +1779,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
 
-tile_size * {x:UInt16} AS tile_x_begin,
-tile_size * ({x:UInt16} + 1) AS tile_x_end,
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
 
-tile_size * {y:UInt16} AS tile_y_begin,
-tile_size * ({y:UInt16} + 1) AS tile_y_end,
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
 
 mercator_x >= tile_x_begin AND mercator_x < tile_x_end
 AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
