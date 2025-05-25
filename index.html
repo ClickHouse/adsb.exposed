@@ -818,64 +818,72 @@
                 return result;
             }
 
-            function createList(sql, field, elem_id, title, separator, link_content_func, wiki_field) {
-                calculateReport(sql, field).then(json => {
+            function createList(condition, report) {
+                calculateReport(report.query(condition), report.field).then(json => {
                     if (current_report_sequence_num != report_sequence_num) return;
 
-                    let elem = document.getElementById(elem_id);
+                    let elem = document.getElementById(report.id);
                     clearContainer(elem);
-                    elem.appendChild(document.createTextNode(title));
+                    elem.appendChild(document.createTextNode(report.title));
                     for (const [idx, row] of json.data.entries()) {
                         if (idx) {
-                            let comma = document.createTextNode(separator);
+                            let comma = document.createTextNode(report.separator);
                             elem.appendChild(comma);
                         }
-                        let link = document.createElement('a');
-                        link.textContent = link_content_func(row);
-                        link.addEventListener('click', e => {
-                            let sql_value = row[field].replace('\\', '\\\\').replace('\'', '\\\'');
-                            let condition = `${field} = '${sql_value}'`;
-                            let changed_query = current_query.replace(
-                                /(WHERE.+?)(\/\* Filter: \*\/ AND .+)?(GROUP BY)/is,
-                                '$1' + '/* Filter: */ AND ' + condition + '\n$3');
 
-                            setQuery(changed_query);
-                        });
+                        if (report.html) {
+                            let item = document.createElement('span');
+                            item.innerHTML = report.html(row);
+                            elem.appendChild(item);
+                        } else {
+                            let link = document.createElement('a');
+                            link.textContent = report.content(row);
 
-                        /// Pictures from Wikipedia
-                        if (wiki_field) {
-                            link.addEventListener('mouseover', e => {
-                                findPictureCached(row[wiki_field]).then(data => {
-                                    if (data) {
-                                        let picture = document.getElementById('picture');
-                                        picture.style.display = 'block';
-                                        picture.firstChild.src = data.src;
-                                        let copyright = document.getElementById('picture-copyright');
-                                        copyright.innerHTML = data.attr;
-                                        /// Sometimes there are tables, paragraphs, etc. Strip them.
-                                        copyright.innerHTML = copyright.innerText;
-                                    }
+                            link.addEventListener('click', e => {
+                                let sql_value = "'" + row[report.field].replace('\\', '\\\\').replace('\'', '\\\'') + "'";
+                                let condition = report.filter_expr ? report.filter_expr(sql_value) : `${report.field} = ${sql_value}`;
+                                let changed_query = current_query.replace(
+                                    /(WHERE.+?)(\/\* Filter: \*\/ AND .+)?(GROUP BY)/is,
+                                    '$1' + '/* Filter: */ AND ' + condition + '\n$3');
+
+                                setQuery(changed_query);
+                            });
+
+                            /// Pictures from Wikipedia
+                            if (report.wiki_field) {
+                                link.addEventListener('mouseover', e => {
+                                    findPictureCached(row[report.wiki_field]).then(data => {
+                                        if (data) {
+                                            let picture = document.getElementById('picture');
+                                            picture.style.display = 'block';
+                                            picture.firstChild.src = data.src;
+                                            let copyright = document.getElementById('picture-copyright');
+                                            copyright.innerHTML = data.attr;
+                                            /// Sometimes there are tables, paragraphs, etc. Strip them.
+                                            copyright.innerHTML = copyright.innerText;
+                                        }
+                                    });
                                 });
-                            });
-                            link.addEventListener('mouseout', e => {
-                                let picture = document.getElementById('picture');
-                                picture.style.display = 'none';
-                                picture.firstChild.src = '';
-                            });
-                        }
+                                link.addEventListener('mouseout', e => {
+                                    let picture = document.getElementById('picture');
+                                    picture.style.display = 'none';
+                                    picture.firstChild.src = '';
+                                });
+                            }
 
-                        elem.appendChild(link);
+                            elem.appendChild(link);
+                        }
                     }
                     if (json.data.length >= 100) elem.appendChild(document.createTextNode('…'));
                 });
             }
 
-            calculateReport(config.report_total.query(condition)).then(json => {
+            calculateReport(config.report_total.query(condition), "total").then(json => {
                 document.getElementById('report_total').textContent = config.report_total.content(json);
             });
 
             config.reports.forEach(report => {
-                createList(report.query(condition), report.field, report.id, report.title, report.separator, report.content, report.wiki_field ?? null);
+                createList(condition, report);
             });
         }
 
