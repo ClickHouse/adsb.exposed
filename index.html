@@ -552,7 +552,7 @@
 
             return config.endpoints.find(endpoint => endpoint.name == provider).urls.map(url => {
                 if (stick && url.sticky) {
-                    const hash = sipHash128(JSON.stringify(stick)).substr(0, 3);
+                    const hash = sipHash128(JSON.stringify(stick)).substr(0, 3).replace('ad', 'be'); /// Compatibility with AdGuard
                     return url.sticky.replace('{hash}', hash);
                 } else {
                     return url.url;
