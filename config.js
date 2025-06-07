@@ -1275,15 +1275,19 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
                 SELECT
-                    count() AS places
+                    count() AS traces, minIf(date, date != '1970-01-01') AS first, maxIf(date, date != '1970-01-01') AS last
                 FROM {table:Identifier}
                 WHERE ${condition}`),
             content: (json => {
                 let row = json.data[0];
-                let text = `Total ${Number(row.places).toLocaleString()} traces.`;
+                let text = `Total ${Number(row.traces).toLocaleString()} traces.`;
 
                 if (json.statistics.rows_read > 1) {
                     text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                }
+
+                if (row.traces > 0) {
+                    text += ` Time: ${row.first} — ${row.last}.`;
                 }
 
                 return text;
@@ -1593,6 +1597,43 @@ max(least(255, individualcount / 65536)) AS red
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
 WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+            "Time": `WITH
+bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+tile_size * {x:UInt32} AS tile_x_begin,
+tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+tile_size * {y:UInt32} AS tile_y_begin,
+tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+y * 1024 + x AS pos,
+
+count() AS total,
+
+pow(greatest(0, avg(dateDiff('day', '1970-01-01'::Date, date) / dateDiff('day', '1970-01-01'::Date, '2024-01-01'::Date))), 3) AS days1,
+pow(greatest(0, avg(dateDiff('day', '2000-01-01'::Date, date) / dateDiff('day', '2000-01-01'::Date, '2024-01-01'::Date))), 3) AS days2,
+
+pow(least(1, total / 100 * zoom_factor), 1/5) AS color1,
+pow(least(1, total / 10000 * zoom_factor), 1/5) AS color2,
+pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color3,
+
+color2 * 255 AS alpha,
+color1 * 255 AS red,
+days1 * 255 AS green,
+days2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND date != '1970-01-01'
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         },
     },
