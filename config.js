@@ -3,6 +3,15 @@ const datasets = {
         notice: "© adsb.lol (ODbL v1.0), © airplanes.live, © adsbexchange.com",
         endpoints: [
             {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+            {
                 name: "Any",
                 urls: [
                     {
@@ -11,15 +20,6 @@ const datasets = {
                     },
                     {
                         url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
-            {
-                name: "Cloud (Real-Time)",
-                urls: [
-                    {
-                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
                     }
                 ]
             },
