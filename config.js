@@ -11,26 +11,6 @@ const datasets = {
                     }
                 ]
             },
-            {
-                name: "Any",
-                urls: [
-                    {
-                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
-                    },
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
-            {
-                name: "Self-hosted (Snapshot)",
-                urls: [
-                    {
-                        url: "https://fly-selfhosted-backend-3.clickhouse.com",
-                    }
-                ]
-            },
         ],
         levels: [
             { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
