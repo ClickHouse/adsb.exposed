@@ -366,14 +366,27 @@
                 if (!idx) {
                     span.className = 'selected';
                     query_elem.value = queries[example];
+                    last_selected_example = example;
                 }
                 span.append(document.createTextNode(example));
                 span.addEventListener('click', e => {
+                    /// Extract WHERE patch from user's edits before switching.
+                    let patch = null;
+                    if (last_selected_example && queries[last_selected_example]) {
+                        patch = getWherePatch(query_elem.value, queries[last_selected_example]);
+                    }
+
                     for (other of examples_elem.querySelectorAll('.selected')) {
                         other.classList.remove('selected');
                     }
                     e.target.classList.add('selected');
-                    setQuery(queries[example]);
+                    last_selected_example = example;
+
+                    let new_query = queries[example];
+                    if (patch) {
+                        new_query = applyWherePatch(new_query, patch);
+                    }
+                    setQuery(new_query);
                 });
                 examples_elem.append(span);
             });
@@ -499,6 +512,7 @@
         let map_elem = document.getElementById('map');
         let selected_box = [];
         let cached_tiles = {};
+        let last_selected_example = null;
 
         /// Protect from race conditions.
         let report_sequence_num = 0;
@@ -525,6 +539,39 @@
                 photos_layer.redraw();
             }
             if (selected_box.length == 2) showReport();
+        }
+
+        /// Extract the WHERE clause content (between WHERE and GROUP BY) from a query.
+        function extractWhereClause(query) {
+            const match = /WHERE(.+?)GROUP\s+BY/is.exec(query);
+            return match ? match[1].trim() : null;
+        }
+
+        /// Get user's WHERE clause modifications by comparing with the original example.
+        function getWherePatch(currentQuery, originalQuery) {
+            const currentWhere = extractWhereClause(currentQuery);
+            const originalWhere = extractWhereClause(originalQuery);
+            if (!currentWhere || !originalWhere) return null;
+
+            /// Normalize whitespace for comparison.
+            const normalize = s => s.replace(/\s+/g, ' ').trim();
+            const normCurrent = normalize(currentWhere);
+            const normOriginal = normalize(originalWhere);
+
+            if (normCurrent === normOriginal) return null;
+
+            /// Check if the current WHERE starts with the original WHERE content.
+            if (normCurrent.startsWith(normOriginal)) {
+                return normCurrent.slice(normOriginal.length).trim();
+            }
+
+            return null;
+        }
+
+        /// Apply a WHERE patch to a new query.
+        function applyWherePatch(query, patch) {
+            if (!patch) return query;
+            return query.replace(/(WHERE\s+.+?)\s*(GROUP\s+BY)/is, '$1 ' + patch + '\n$2');
         }
 
         function setQuery(value) {
@@ -779,6 +826,7 @@
                         example.classList.remove('selected');
                         if (query == queries[example.innerText]) {
                             example.classList.add('selected');
+                            last_selected_example = example.innerText;
                         }
                     }
                 });
