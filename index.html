@@ -822,6 +822,7 @@
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
                     updateMap();
 
+                    last_selected_example = null;
                     for (example of examples_elem.querySelectorAll('span')) {
                         example.classList.remove('selected');
                         if (query == queries[example.innerText]) {
