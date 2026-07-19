@@ -947,346 +947,6 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         }
     },
 
-    "Ships": {
-        notice: "© Konstantin Boganov, ClickHouse, Inc., data: © aishub.net",
-        endpoints: [
-            {
-                name: "Cloud (Real-Time)",
-                urls: [
-                    {
-                        url: "https://g2f8dzt67h.eu-west-1.aws.clickhouse-staging.com",
-                    }
-                ]
-            },
-        ],
-        levels: [
-            { table: 'ais_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'ais_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'ais_mercator',           sample: 1,   priority: 3 },
-        ],
-        report_total: {
-            query: (condition => `
-                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT
-                    count() AS traces,
-                    uniq(mmsi) AS vessels,
-                    round(avgIf(sog, sog < 60), 1) AS avg_sog,
-                    min(timestamp) AS first, max(timestamp) AS last
-                FROM {table:Identifier}
-                WHERE ${condition}`),
-            content: (json => {
-                let row = json.data[0];
-                let text = `Total ${Number(row.traces).toLocaleString()} traces from ${Number(row.vessels).toLocaleString()} vessels.`;
-
-                if (row.traces > 0) {
-                    text += ` Avg speed: ${row.avg_sog} kn. Time: ${row.first} — ${row.last}.`;
-                }
-
-                if (json.statistics.rows_read > 1) {
-                    text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
-                }
-
-                return text;
-            }),
-        },
-        reports: [
-            {
-                query: (condition => `
-                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT toString(mmsi) AS mmsi_str, count() AS c, round(avgIf(sog, sog < 60), 1) AS avg_sog
-                    FROM {table:Identifier}
-                    WHERE ${condition}
-                    GROUP BY mmsi
-                    ORDER BY c DESC
-                    LIMIT 100`),
-                field: 'mmsi_str',
-                id: 'report_mmsi',
-                title: 'MMSIs: ',
-                separator: ', ',
-                filter_expr: (value => `mmsi = ${value.replaceAll("'", "")}`),
-                content: (row => `${row.mmsi_str} (${Number(row.c).toLocaleString()} pts, ${row.avg_sog} kn)`)
-            },
-            {
-                query: (condition => `
-                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT toString(nav_status) AS nav_status_str, count() AS c
-                    FROM {table:Identifier}
-                    WHERE ${condition}
-                    GROUP BY nav_status
-                    ORDER BY c DESC
-                    LIMIT 100`),
-                field: 'nav_status_str',
-                id: 'report_navstatus',
-                title: 'Nav status:\n',
-                separator: ',\n',
-                filter_expr: (value => `nav_status = ${value.replaceAll("'", "")}`),
-                content: (row => `${SHIPS_NAV_STATUS[row.nav_status_str] || `code ${row.nav_status_str}`} (${Number(row.c).toLocaleString()})`)
-            },
-        ],
-        queries: {
-"Speed": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 105)) / 105 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
-    AND mmsi >= 100000000
-    AND sog < 60
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"Fishing": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 15)) / 15 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
-    AND mmsi >= 100000000
-    AND sog < 60
-    AND nav_status = 7
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"Anchored": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 5)) / 5 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
-    AND mmsi >= 100000000
-    AND nav_status IN (1, 5)
-    AND sog < 1
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"Stopped": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 1)) AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
-    AND mmsi >= 100000000
-    AND sog < 0.5
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"High-speed": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog) - 25, 25)) / 25 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
-    AND mmsi >= 100000000
-    AND sog > 25 AND sog < 60
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"Emergency": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 200)) / 200 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND (nav_status IN (2, 6, 14)
-        OR intDiv(mmsi, 1000000) IN (111, 970, 972, 974, 979))
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-
-"Aircraft": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-
-    y * 1024 + x AS pos,
-
-    count() AS total,
-    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
-
-    pow(total / max_total, 1/5) AS transparency,
-    greatest(0, least(avg(sog), 500)) / 500 AS color2,
-
-    255 AS alpha,
-    (1 + transparency) / 2 * 0.9 * 255 AS red,
-    transparency * 255 AS green,
-    color2 * 255 AS blue
-
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-    AND intDiv(mmsi, 1000000) = 111
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
-        }
-    },
-
     "Places": {
         notice: "© Foursquare Labs, Inc., Apache 2.0",
         endpoints: [
@@ -2105,6 +1765,346 @@ FROM {table:Identifier}
 WHERE in_tile
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         },
+    },
+
+    "Ships": {
+        notice: "© Konstantin Boganov, ClickHouse, Inc., data: © aishub.net",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://g2f8dzt67h.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'ais_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'ais_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'ais_mercator',           sample: 1,   priority: 3 },
+        ],
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT
+                    count() AS traces,
+                    uniq(mmsi) AS vessels,
+                    round(avgIf(sog, sog < 60), 1) AS avg_sog,
+                    min(timestamp) AS first, max(timestamp) AS last
+                FROM {table:Identifier}
+                WHERE ${condition}`),
+            content: (json => {
+                let row = json.data[0];
+                let text = `Total ${Number(row.traces).toLocaleString()} traces from ${Number(row.vessels).toLocaleString()} vessels.`;
+
+                if (row.traces > 0) {
+                    text += ` Avg speed: ${row.avg_sog} kn. Time: ${row.first} — ${row.last}.`;
+                }
+
+                if (json.statistics.rows_read > 1) {
+                    text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                }
+
+                return text;
+            }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT toString(mmsi) AS mmsi_str, count() AS c, round(avgIf(sog, sog < 60), 1) AS avg_sog
+                    FROM {table:Identifier}
+                    WHERE ${condition}
+                    GROUP BY mmsi
+                    ORDER BY c DESC
+                    LIMIT 100`),
+                field: 'mmsi_str',
+                id: 'report_mmsi',
+                title: 'MMSIs: ',
+                separator: ', ',
+                filter_expr: (value => `mmsi = ${value.replaceAll("'", "")}`),
+                content: (row => `${row.mmsi_str} (${Number(row.c).toLocaleString()} pts, ${row.avg_sog} kn)`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT toString(nav_status) AS nav_status_str, count() AS c
+                    FROM {table:Identifier}
+                    WHERE ${condition}
+                    GROUP BY nav_status
+                    ORDER BY c DESC
+                    LIMIT 100`),
+                field: 'nav_status_str',
+                id: 'report_navstatus',
+                title: 'Nav status:\n',
+                separator: ',\n',
+                filter_expr: (value => `nav_status = ${value.replaceAll("'", "")}`),
+                content: (row => `${SHIPS_NAV_STATUS[row.nav_status_str] || `code ${row.nav_status_str}`} (${Number(row.c).toLocaleString()})`)
+            },
+        ],
+        queries: {
+"Speed": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 105)) / 105 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
+    AND mmsi >= 100000000
+    AND sog < 60
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Fishing": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 15)) / 15 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
+    AND mmsi >= 100000000
+    AND sog < 60
+    AND nav_status = 7
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Anchored": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 5)) / 5 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
+    AND mmsi >= 100000000
+    AND nav_status IN (1, 5)
+    AND sog < 1
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Stopped": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 1)) AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
+    AND mmsi >= 100000000
+    AND sog < 0.5
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"High-speed": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog) - 25, 25)) / 25 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) NOT IN (111, 970, 972, 974, 979)
+    AND mmsi >= 100000000
+    AND sog > 25 AND sog < 60
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Emergency": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 200)) / 200 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND (nav_status IN (2, 6, 14)
+        OR intDiv(mmsi, 1000000) IN (111, 970, 972, 974, 979))
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"Aircraft": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 500)) / 500 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+    AND intDiv(mmsi, 1000000) = 111
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
     },
 
     "You": {
