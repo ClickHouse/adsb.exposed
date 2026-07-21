@@ -1768,13 +1768,14 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     },
 
     "Ships": {
-        notice: "© Konstantin Boganov, ClickHouse, Inc., data: © aishub.net",
+        notice: "© Konstantin Bogdanov, ClickHouse, Inc., data: © aishub.net",
         endpoints: [
             {
                 name: "Cloud (Real-Time)",
                 urls: [
                     {
-                        url: "https://g2f8dzt67h.eu-west-1.aws.clickhouse-staging.com",
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
                     }
                 ]
             },
