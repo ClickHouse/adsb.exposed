@@ -596,7 +596,7 @@
 
         function getHosts(stick) {
             const provider = providers_elem.querySelector('input[name="provider"]:checked').value;
-            const hash = stick ? sipHash128(JSON.stringify(stick)).substr(0, 3).replace('ad', 'be') : null; /// Compatibility with AdGuard
+            const hash = stick ? sipHash128(JSON.stringify(stick)).substr(0, 3) : null;
 
             return config.endpoints.find(endpoint => endpoint.name == provider).urls.map(url => ({
                 url: url.url,
