@@ -596,15 +596,13 @@
 
         function getHosts(stick) {
             const provider = providers_elem.querySelector('input[name="provider"]:checked').value;
+            const hash = stick ? sipHash128(JSON.stringify(stick)).substr(0, 3).replace('ad', 'be') : null; /// Compatibility with AdGuard
 
-            return config.endpoints.find(endpoint => endpoint.name == provider).urls.map(url => {
-                if (stick && url.sticky) {
-                    const hash = sipHash128(JSON.stringify(stick)).substr(0, 3).replace('ad', 'be'); /// Compatibility with AdGuard
-                    return url.sticky.replace('{hash}', hash);
-                } else {
-                    return url.url;
-                }
-            });
+            return config.endpoints.find(endpoint => endpoint.name == provider).urls.map(url => ({
+                url: url.url,
+                /// The proxy pins requests to a backend replica via the session_id query param.
+                session: (hash && url.sticky) ? `&session_id=${hash}` : '',
+            }));
         }
 
         class CustomError extends Error {
@@ -657,11 +655,12 @@
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
                 const hosts = getHosts(key);
-                const url = host => `${host}/?user=website&default_format=RowBinary` +
+                const url = host => `${host.url}/?user=website&default_format=RowBinary` +
                     (config.disable_cache ? '&use_query_cache=0' : '') +
                     `&query_id=${query_id}&replace_running_query=1` +
                     `&param_table=${level.table}&param_sampling=${level.sample}` +
-                    `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
+                    `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}` +
+                    host.session;
 
                 progress_update_period = 1;
 
@@ -739,9 +738,10 @@
             ++query_sequence_num;
             const query_id = `${uuid}-${query_sequence_num}-flickr_mercator_top-${coords.z + 2}-${coords.x}-${coords.y}`;
             const hosts = getHosts(`${coords.z}-${coords.x}-${coords.y}`);
-            const url = host => `${host}/?user=website&default_format=JSON` +
+            const url = host => `${host.url}/?user=website&default_format=JSON` +
                 `&query_id=${query_id}&replace_running_query=1` +
-                `&param_z=${coords.z + 2}&param_x=${coords.x}&param_y=${coords.y}`;
+                `&param_z=${coords.z + 2}&param_x=${coords.x}&param_y=${coords.y}` +
+                host.session;
 
             progress_update_period = 1;
 
@@ -888,12 +888,13 @@
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
-                const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
+                const url = host => `${host.url}/?user=website&default_format=JSON&query_id=${query_id}` +
                     `&param_table=${levels[levels.length - 1].table}` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
                     `&param_top=${Math.min(selected_box[0].y, selected_box[1].y)}` +
-                    `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
+                    `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}` +
+                    host.session;
 
                 progress_update_period = 1;
                 const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
@@ -1163,7 +1164,7 @@
                 WHERE user = 'website' AND startsWith(query_id, {uuid:String})`;
 
             const hosts = getHosts(uuid);
-            const url = host => `${host}/?user=website_progress&default_format=JSON&skip_unavailable_shards=1&param_uuid=${uuid}`;
+            const url = host => `${host.url}/?user=website_progress&default_format=JSON&skip_unavailable_shards=1&param_uuid=${uuid}${host.session}`;
 
             let responses = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: sql })));
             let datas = await Promise.all(responses.map(response => response.json()));
@@ -1253,14 +1254,14 @@
         async function saveQuery(text) {
             const sql = `INSERT INTO saved_queries (text) FORMAT RawBLOB`;
             const hosts = getHosts(null);
-            const url = host => `${host}/?user=website_saved_queries&query=${encodeURIComponent(sql)}`;
+            const url = host => `${host.url}/?user=website_saved_queries&query=${encodeURIComponent(sql)}${host.session}`;
             const response = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: text })));
         }
 
         async function loadQuery(hash) {
             const sql = `SELECT text FROM saved_queries WHERE hash = unhex({hash:String}) LIMIT 1`;
             const hosts = getHosts(null);
-            const url = host => `${host}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}`;
+            const url = host => `${host.url}/?user=website_saved_queries&default_format=JSON&param_hash=${hash}${host.session}`;
             const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
             const data = await response.json();
             return data.data[0].text;
@@ -1284,7 +1285,7 @@
 
             const sql = `INSERT INTO stats (mercator_x, mercator_y, zoom, start_time, time_offset_ms, uuid) FORMAT JSONCompactEachRow`;
             const hosts = getHosts(null);
-            const url = host => `${host}/?user=website_stats&query=${encodeURIComponent(sql)}`;
+            const url = host => `${host.url}/?user=website_stats&query=${encodeURIComponent(sql)}${host.session}`;
             const response = await Promise.all(hosts.map(host => fetch(url(host), { method: 'POST', body: JSON.stringify(current_stats).slice(1, -1) })));
         }
 
