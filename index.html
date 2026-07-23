@@ -120,8 +120,25 @@
             white-space: pre-wrap;
             font-size: 16pt;
             padding: 1em;
+            padding-right: 2em;
             min-width: 50%;
             max-width: 80%;
+        }
+
+        #error-close {
+            position: absolute;
+            top: 0;
+            right: 0;
+            padding: 0 .4em;
+            font-size: 20pt;
+            line-height: 1.2em;
+            cursor: pointer;
+            user-select: none;
+            color: #f99;
+        }
+
+        #error-close:hover {
+            color: white;
         }
 
         #selection {
@@ -382,7 +399,7 @@
     <div id="map"><div id="selection"></div></div>
     <div id="report"></div>
     <div id="picture"><img/><span id="picture-copyright">Picture from Wikipedia, &copy; the details at the corresponding page.</span></div>
-    <div id="error"></div>
+    <div id="error"><span id="error-close" title="Close">&times;</span><span id="error-text"></span></div>
     <div id="layers">👁</div>
     <div id="select"><img src="pointer.svg"/></div>
 
@@ -397,6 +414,18 @@
         let config;
         let queries;
         let levels;
+
+        function showError(text) {
+            let err = document.getElementById('error');
+            document.getElementById('error-text').textContent = text;
+            err.style.display = 'block';
+        }
+
+        function hideError() {
+            document.getElementById('error').style.display = 'none';
+        }
+
+        document.getElementById('error-close').addEventListener('click', hideError);
 
         let datasets_elem = document.getElementById('datasets');
         let examples_elem = document.getElementById('examples');
@@ -786,9 +815,7 @@
                     }
                     if (!text.includes('QUERY_WAS_CANCELLED') &&
                         !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
-                        let err = document.getElementById('error');
-                        err.textContent = text;
-                        err.style.display = 'block';
+                        showError(text);
                     }
                     return;
                 }
@@ -800,8 +827,7 @@
             drawTileBuffer(tile, buf);
             last_tile_image[coord_key] = buf;
 
-            let err = document.getElementById('error');
-            err.style.display = 'none';
+            hideError();
         }
 
         L.GridLayer.ClickHouse = L.GridLayer.extend({
@@ -879,9 +905,7 @@
                 }
                 if (!text.includes('QUERY_WAS_CANCELLED') &&
                     !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
-                    let err = document.getElementById('error');
-                    err.textContent = text;
-                    err.style.display = 'block';
+                    showError(text);
                 }
             }
         }
@@ -1515,9 +1539,7 @@
                 if (!response.ok) {
                     const text = await response.text();
                     if (!text.includes('QUERY_WAS_CANCELLED') && !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
-                        let err = document.getElementById('error');
-                        err.textContent = text;
-                        err.style.display = 'block';
+                        showError(text);
                     }
                     return;
                 }
