@@ -26,6 +26,7 @@ const datasets = {
             { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
             { table: 'planes_mercator',           sample: 1,   priority: 3 },
         ],
+        time: { column: 'time' },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -983,6 +984,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         levels: [
             { table: 'foursquare_mercator', sample: 1, priority: 1 },
         ],
+        time: { column: 'date_created', exclude: 'date_created IS NOT NULL' },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -1259,6 +1261,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         levels: [
             { table: 'birds_mercator', sample: 1, priority: 1 },
         ],
+        time: { column: 'date', exclude: "date != '1970-01-01'" },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -1643,6 +1646,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         levels: [
             { table: 'flickr_mercator', sample: 1, priority: 1 },
         ],
+        time: { column: 'datetaken', exclude: "datetaken >= '2000-01-01' AND datetaken < '2026-01-01'" },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -1785,6 +1789,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
             { table: 'ais_mercator_sample10',  sample: 10,  priority: 2 },
             { table: 'ais_mercator',           sample: 1,   priority: 3 },
         ],
+        time: { column: 'timestamp' },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -2124,6 +2129,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         levels: [
             { table: 'stats', sample: 1, priority: 1 },
         ],
+        time: { column: 'time' },
         disable_cache: true,
         report_total: {
             query: (condition => `

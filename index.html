@@ -41,7 +41,7 @@
         body {
             display: grid;
             grid-template-columns: auto var(--report-width);
-            grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) 1em auto;
+            grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) fit-content(2.6em) 1em auto;
             grid-gap: 0;
         }
 
@@ -131,6 +131,79 @@
             border: 1px dashed white;
             backdrop-filter: brightness(150%);
             -webkit-backdrop-filter: brightness(150%); /* Safari */
+        }
+
+        #timeslider {
+            grid-column: span 2;
+            position: relative;
+            display: block;
+            background: #181a1b;
+            height: 2.6em;
+            padding: 0;
+            overflow: hidden;
+            font-family: monospace;
+            color: #aaa;
+            user-select: none;
+        }
+
+        #timeslider-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: ew-resize;
+            touch-action: none;
+        }
+
+        #timeslider-title {
+            position: absolute;
+            left: 0.5em;
+            top: 0.2em;
+            font-size: 10pt;
+            color: #bbb;
+            pointer-events: none;
+            z-index: 2;
+            text-shadow: 0 1px 2px #000, 0 0 4px #000, 0 0 4px #000;
+        }
+
+        #timeslider-label {
+            color: #eee;
+            white-space: nowrap;
+            text-shadow: 0 1px 2px #000, 0 0 4px #000, 0 0 4px #000;
+        }
+
+        #timeslider-hover {
+            position: absolute;
+            bottom: 0.05em;
+            display: none;
+            transform: translateX(-50%);
+            font-size: 9pt;
+            color: #fff;
+            background: rgba(16, 18, 19, 0.85);
+            padding: 0 0.3em;
+            border-radius: 2px;
+            white-space: nowrap;
+            pointer-events: none;
+            z-index: 3;
+            text-shadow: 0 0 2px #000;
+        }
+
+        #timeslider-reset {
+            position: absolute;
+            right: 0.4em;
+            top: 0.1em;
+            z-index: 2;
+            display: none;
+            background: #444;
+            color: white;
+            font-size: 10pt;
+            padding: 0.1em 0.5em;
+            border: solid 0.125em black;
+            cursor: pointer;
+        }
+
+        #timeslider-reset:hover {
+            background: yellow;
+            color: black;
         }
 
         #stats {
@@ -299,6 +372,12 @@
     <div id="datasets" class="choices"></div>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
     <div id="examples" class="choices"></div>
+    <div id="timeslider">
+        <span id="timeslider-title">Time: <span id="timeslider-label"></span></span>
+        <span id="timeslider-reset">Reset</span>
+        <canvas id="timeslider-canvas"></canvas>
+        <span id="timeslider-hover"></span>
+    </div>
     <div id="stats"></div>
     <div id="map"><div id="selection"></div></div>
     <div id="report"></div>
@@ -348,6 +427,8 @@
             config = datasets[dataset];
             queries = config.queries;
             levels = config.levels;
+
+            resetTimeSlider();
 
             clearContainer(examples_elem);
             clearContainer(reports_elem);
@@ -486,6 +567,7 @@
             });
 
             cached_tiles = {};
+            last_tile_image = {};
             updateMap();
         }
 
@@ -503,7 +585,9 @@
             center: [52.3676, 4.9041],
             zoom: 5,
             worldCopyJump: true,
-            layers: [base_layer]
+            layers: [base_layer],
+            /// Avoid fading tiles in/out so refreshed data replaces the old image cleanly.
+            fadeAnimation: false
         });
 
         map.attributionControl.setPrefix('<a href="https://github.com/ClickHouse/adsb.exposed/">About</a>');
@@ -533,6 +617,8 @@
             if (selected_example && query_elem.value != queries[selected_example.textContent]) {
                 selected_example.classList.remove('selected');
             }
+
+            updateTimeSlider();
 
             layers[0]?.redraw();
             if (photos_layer_active) {
@@ -643,9 +729,26 @@
         let progress_update_period = null;
         let query_sequence_num = 0;
 
+        /// The last image drawn for each tile position, kept so that when the query or time
+        /// window changes we can keep showing the previous image until the new one is loaded
+        /// (instead of blinking to blank). Keyed by table + tile coordinates.
+        let last_tile_image = {};
+
+        function drawTileBuffer(tile, buf) {
+            const ctx = tile.getContext('2d');
+            const image = ctx.createImageData(1024, 1024, {colorSpace: 'display-p3'});
+            image.data.set(new Uint8ClampedArray(buf));
+            ctx.putImageData(image, 0, 0, 0, 0, 1024, 1024);
+        }
+
         async function render(level, coords, tile) {
-            const sql = query_elem.value;
+            /// Each render of a given tile element bumps a token; a slower, superseded
+            /// request must not overwrite the tile drawn by a newer one.
+            const token = tile._renderToken = (tile._renderToken || 0) + 1;
+
+            const sql = applyTimeWindow(query_elem.value);
             const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
+            const coord_key = `${level.table}-${coords.z}-${coords.x}-${coords.y}`;
 
             let buf;
             if (!config.disable_cache) {
@@ -691,13 +794,11 @@
                 }
             }
 
-            let ctx = tile.getContext('2d');
-            let image = ctx.createImageData(1024, 1024, {colorSpace: 'display-p3'});
-            let arr = new Uint8ClampedArray(buf);
+            /// A newer render for this tile has started; don't overwrite it with stale data.
+            if (tile._renderToken !== token) return;
 
-            for (let i = 0; i < 1024 * 1024 * 4; ++i) { image.data[i] = arr[i]; }
-
-            ctx.putImageData(image, 0, 0, 0, 0, 1024, 1024);
+            drawTileBuffer(tile, buf);
+            last_tile_image[coord_key] = buf;
 
             let err = document.getElementById('error');
             err.style.display = 'none';
@@ -708,15 +809,31 @@
                 let tile = L.DomUtil.create('canvas', 'leaflet-tile');
                 tile.width = 1024;
                 tile.height = 1024;
-                render(this.options.level, coords, tile).then(err => done(err, tile));
+                /// Keep the previous image visible (no blink) until the new one arrives.
+                const level = this.options.level;
+                const previous = last_tile_image[`${level.table}-${coords.z}-${coords.x}-${coords.y}`];
+                if (previous) drawTileBuffer(tile, previous);
+                render(level, coords, tile).then(err => done(err, tile));
                 return tile;
+            },
+
+            /// Re-render the tiles that are already on screen in place, without removing
+            /// them. render() only overwrites each canvas once its new data arrives, so the
+            /// current image stays put until then — no blank, and no drop to a coarser layer.
+            refreshTiles: function() {
+                for (const k in this._tiles) {
+                    const t = this._tiles[k];
+                    if (t && t.el && t.current) render(this.options.level, t.coords, t.el);
+                }
             }
         });
 
         /// Special layer made of photos.
         async function getTopPhoto(coords) {
             /// This is fairly dirty.
-            const condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+            let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+            const time_cond = getTimeCondition();
+            if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
             const sql = `WITH
                 bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -794,6 +911,488 @@
             maxNativeZoom: 19,
         });
 
+        /// Time slider
+        ///
+        /// For datasets that configure a `time` column, we show a histogram of activity by day
+        /// below the examples, with two draggable handles that narrow the time window. When the
+        /// window is narrowed, the corresponding time condition is added to the main query, the
+        /// reports, and the photos overlay. The histogram itself reflects all the other filters
+        /// of the main query (the built-in example filters and the user filter), but not the
+        /// geographic tile predicate (which is per-tile) and not the time window itself.
+
+        const MS_PER_DAY = 86400000;
+
+        let timeslider_elem = document.getElementById('timeslider');
+        let time_canvas = document.getElementById('timeslider-canvas');
+        let time_label_elem = document.getElementById('timeslider-label');
+        let time_reset_elem = document.getElementById('timeslider-reset');
+        let time_hover_elem = document.getElementById('timeslider-hover');
+
+        let time_data = [];            /// [{day, count}], day = integer days since epoch.
+        let time_min_day = null;
+        let time_max_day = null;
+        let time_window = null;        /// {from, to} in day units, or null when the full range is selected.
+        let time_hist_cond = null;     /// The last histogram condition, to avoid redundant reloads.
+        let time_hist_seq = 0;
+        let time_drag = null;          /// 'from' | 'to' | 'move' while dragging.
+        let time_drag_anchor = 0;      /// Day under the cursor when a 'move' drag started.
+        let time_drag_from0 = 0;       /// Window bounds when a 'move' drag started.
+        let time_drag_to0 = 0;
+        let time_hover_x = null;       /// Cursor x within the canvas (css px) while hovering, or null.
+
+        function dayToDateStr(day) {
+            return new Date(day * MS_PER_DAY).toISOString().slice(0, 10);
+        }
+
+        function dateStrToDay(s) {
+            return Math.floor(Date.parse(s.length <= 10 ? s + 'T00:00:00Z' : s + 'Z') / MS_PER_DAY);
+        }
+
+        /// The time condition to inject into queries, or null when the window is not narrowed.
+        function getTimeCondition() {
+            if (!config.time || !time_window) return null;
+            const col = config.time.column;
+            const from = dayToDateStr(time_window.from);
+            const to = dayToDateStr(time_window.to + 1); /// Exclusive upper bound, inclusive of the last day.
+            return `${col} >= '${from}' AND ${col} < '${to}'`;
+        }
+
+        /// Inject the time window into a main tile query, right before its GROUP BY.
+        function applyTimeWindow(sql) {
+            const cond = getTimeCondition();
+            if (!cond) return sql;
+            return sql.replace(/(\bWHERE\b[\s\S]*?)(\bGROUP\s+BY\b)/i,
+                `$1/* Time: */ AND ${cond}\n$2`);
+        }
+
+        /// The WHERE condition for the histogram: the main query's filters without the
+        /// geographic tile predicate (which is replaced by a constant true).
+        function getHistogramCondition() {
+            const m = /\bWHERE\b([\s\S]+?)\bGROUP\s+BY\b/i.exec(query_elem.value);
+            if (!m) return '1';
+            return m[1].replace(/\bin_tile\b/, '1').trim();
+        }
+
+        function resetTimeSlider() {
+            time_window = null;
+            time_hist_cond = null;
+            time_min_day = null;
+            time_max_day = null;
+            time_data = [];
+            time_drag = null;
+            time_reset_elem.style.display = 'none';
+            time_label_elem.textContent = '';
+        }
+
+        function updateTimeSlider() {
+            /// Showing/hiding the slider changes the map's height, so Leaflet must re-measure,
+            /// otherwise it keeps the stale size and leaves part of the map unloaded.
+            const want = config.time ? 'block' : 'none';
+            if (timeslider_elem.style.display !== want) {
+                timeslider_elem.style.display = want;
+                if (typeof map !== 'undefined' && map) map.invalidateSize();
+            }
+            if (!config.time) return;
+
+            /// Reload when either the query filters or the selected rectangle change.
+            const sig = getHistogramSignature();
+            if (sig !== time_hist_cond) {
+                time_hist_cond = sig;
+                loadHistogram();
+            } else {
+                drawHistogram();
+            }
+        }
+
+        /// The geographic bounds of the current rectangular selection, or null.
+        function getSelectionBounds() {
+            if (selected_box.length != 2) return null;
+            return {
+                left: Math.min(selected_box[0].x, selected_box[1].x),
+                right: Math.max(selected_box[0].x, selected_box[1].x),
+                top: Math.min(selected_box[0].y, selected_box[1].y),
+                bottom: Math.max(selected_box[0].y, selected_box[1].y),
+            };
+        }
+
+        function getHistogramSignature() {
+            const b = getSelectionBounds();
+            return getHistogramCondition() + '|' + (b ? `${b.left},${b.right},${b.top},${b.bottom}` : '');
+        }
+
+        async function loadHistogram() {
+            ++time_hist_seq;
+            const seq = time_hist_seq;
+
+            const col = config.time.column;
+            const cond = getHistogramCondition();
+            const exclude = config.time.exclude ? ` AND (${config.time.exclude})` : '';
+
+            /// Read the cheapest (most-sampled) table. With a rectangular selection we return,
+            /// per day, both the count inside the area and the total (without the selection),
+            /// from the same sampled table, so the ratio between them is unbiased. Without a
+            /// selection we just return the daily totals.
+            const bounds = getSelectionBounds();
+            const table = config.levels[0].table;
+            const geoParams = bounds
+                ? `&param_left=${bounds.left}&param_right=${bounds.right}&param_top=${bounds.top}&param_bottom=${bounds.bottom}`
+                : '';
+
+            const selectExpr = bounds
+                ? `countIf(mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}` +
+                  ` AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32}) AS area, count() AS total`
+                : `count() AS c`;
+
+            const sql = `SELECT toInt32(toDate32(${col})) AS d, ${selectExpr}
+                FROM {table:Identifier}
+                WHERE (${cond})${exclude}
+                GROUP BY d ORDER BY d`;
+
+            const query_id = `${uuid}-timeslider-${seq}`;
+            const hosts = getHosts('timeslider');
+            const url = host => `${host}/?user=website&default_format=JSON` +
+                (config.disable_cache ? '&use_query_cache=0' : '') +
+                `&query_id=${query_id}&replace_running_query=1&param_table=${table}${geoParams}`;
+
+            progress_update_period = 1;
+
+            try {
+                const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
+                const json = await response.json();
+                if (seq != time_hist_seq) return;
+                processHistogram(json.data);
+            } catch (error) {
+                let text;
+                if (error.errors) {
+                    text = await error.errors[0].payload.text();
+                } else {
+                    text = error.toString();
+                }
+                if (!text.includes('QUERY_WAS_CANCELLED') &&
+                    !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
+                    console.log('Time slider:', text);
+                }
+            }
+        }
+
+        /// How strongly to damp days with few total observations when showing the area's
+        /// share of the totals: the smoothing constant is this fraction of the busiest day's
+        /// total, added to each day's denominator so low-count days don't turn into noise.
+        const TIME_SMOOTHING = 0.03;
+
+        function processHistogram(data) {
+            const rows = data
+                .filter(r => r.d !== null)
+                .map(r => r.total !== undefined
+                    ? { day: Number(r.d), area: Number(r.area), total: Number(r.total) }
+                    : { day: Number(r.d), count: Number(r.c) })
+                .filter(r => Number.isFinite(r.day));
+
+            if (rows.length && rows[0].total !== undefined) {
+                /// Selection mode: plot the area's share of the totals, area / (total + k).
+                let maxTotal = 0;
+                for (const r of rows) if (r.total > maxTotal) maxTotal = r.total;
+                const k = maxTotal * TIME_SMOOTHING;
+                time_data = rows.map(r => ({ day: r.day, count: r.total + k > 0 ? r.area / (r.total + k) : 0 }));
+            } else {
+                time_data = rows;
+            }
+
+            if (!time_data.length) {
+                time_min_day = null;
+                time_max_day = null;
+                drawHistogram();
+                updateTimeLabel();
+                return;
+            }
+
+            time_min_day = time_data[0].day;
+            time_max_day = time_data[time_data.length - 1].day;
+
+            /// Clamp a restored/existing window to the available range.
+            if (time_window) {
+                time_window.from = Math.max(time_min_day, Math.min(time_window.from, time_max_day));
+                time_window.to = Math.max(time_window.from, Math.min(time_window.to, time_max_day));
+                normalizeWindow();
+            }
+
+            time_reset_elem.style.display = time_window ? 'block' : 'none';
+            drawHistogram();
+            updateTimeLabel();
+        }
+
+        function dayToX(day, w) {
+            const nDays = time_max_day - time_min_day + 1;
+            return (day - time_min_day) / nDays * w;
+        }
+
+        function xToDay(clientX) {
+            const rect = time_canvas.getBoundingClientRect();
+            const nDays = time_max_day - time_min_day + 1;
+            const frac = (clientX - rect.left) / rect.width;
+            return time_min_day + Math.round(frac * nDays - 0.5);
+        }
+
+        function drawHistogram() {
+            const dpr = window.devicePixelRatio || 1;
+            const cssW = time_canvas.clientWidth;
+            const cssH = time_canvas.clientHeight;
+            if (!cssW || !cssH) return;
+
+            time_canvas.width = Math.round(cssW * dpr);
+            time_canvas.height = Math.round(cssH * dpr);
+
+            const ctx = time_canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, cssW, cssH);
+            if (time_min_day === null) return;
+
+            const nDays = time_max_day - time_min_day + 1;
+            const nBuckets = Math.max(1, Math.min(nDays, Math.floor(cssW)));
+            const buckets = new Float64Array(nBuckets);
+            for (const r of time_data) {
+                const b = Math.min(nBuckets - 1, Math.floor((r.day - time_min_day) / nDays * nBuckets));
+                buckets[b] += r.count;
+            }
+
+            let maxC = 0;
+            for (const v of buckets) if (v > maxC) maxC = v;
+
+            /// Rectangular (bar-chart-like) profile: gray bar bodies, brighter-gray vertical
+            /// step edges between neighbours, and yellow tops. Buckets inside the selected
+            /// window are drawn with brighter grays so the selection reads as "lit up".
+            const bw = cssW / nBuckets;
+            const xEdge = b => Math.round(b * bw);
+            const yTop = b => Math.round(cssH - 1 - (maxC > 0 ? Math.pow(buckets[b] / maxC, 0.5) : 0) * (cssH - 2));
+
+            const winFrom = time_window ? time_window.from : time_min_day;
+            const winTo = time_window ? time_window.to : time_max_day;
+            const xL = dayToX(winFrom, cssW);
+            const xR = dayToX(winTo + 1, cssW);
+            /// Only brighten when a window is actually narrowed; the default (full-range)
+            /// view keeps its normal colors.
+            const inside = x => time_window && x >= xL && x < xR;
+
+            /// Bar bodies.
+            for (let b = 0; b < nBuckets; ++b) {
+                const x0 = xEdge(b), x1 = xEdge(b + 1), y = yTop(b);
+                ctx.fillStyle = inside((x0 + x1) / 2) ? '#5f5f5f' : '#333';
+                ctx.fillRect(x0, y, Math.max(1, x1 - x0), cssH - y);
+            }
+
+            /// Vertical step edges between neighbours.
+            for (let b = 1; b < nBuckets; ++b) {
+                const x = xEdge(b), y0 = yTop(b - 1), y1 = yTop(b);
+                ctx.fillStyle = inside(x) ? '#adadad' : '#777';
+                ctx.fillRect(x, Math.min(y0, y1), 1, Math.abs(y1 - y0) + 1);
+            }
+
+            /// Yellow tops, drawn last and spanning both boundary columns so the corner
+            /// pixels belong to the top line rather than to the vertical edges.
+            ctx.fillStyle = '#faff69';
+            for (let b = 0; b < nBuckets; ++b) {
+                const x0 = xEdge(b);
+                ctx.fillRect(x0, yTop(b), xEdge(b + 1) - x0 + 1, 1);
+            }
+
+            /// Dim the region outside the selected window and draw the handles.
+            ctx.fillStyle = 'rgba(16, 18, 19, 0.6)';
+            if (xL > 0) ctx.fillRect(0, 0, xL, cssH);
+            if (xR < cssW) ctx.fillRect(xR, 0, cssW - xR, cssH);
+
+            ctx.fillStyle = '#faff69';
+            ctx.fillRect(xL - 1, 0, 2, cssH);
+            ctx.fillRect(xR - 1, 0, 2, cssH);
+            const gh = Math.min(14, cssH);
+            ctx.fillRect(xL - 3, (cssH - gh) / 2, 6, gh);
+            ctx.fillRect(xR - 3, (cssH - gh) / 2, 6, gh);
+
+            /// Hover cursor line.
+            if (time_hover_x !== null) {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
+                ctx.fillRect(time_hover_x - 0.5, 0, 1, cssH);
+            }
+        }
+
+        function updateTimeLabel() {
+            if (time_min_day === null) {
+                time_label_elem.textContent = '';
+                return;
+            }
+            if (time_window) {
+                time_label_elem.textContent = `${dayToDateStr(time_window.from)} — ${dayToDateStr(time_window.to)}`;
+            } else {
+                time_label_elem.textContent = `${dayToDateStr(time_min_day)} — ${dayToDateStr(time_max_day)}`;
+            }
+        }
+
+        /// Collapse a full-range window back to "not narrowed".
+        function normalizeWindow() {
+            if (time_window &&
+                time_window.from <= time_min_day &&
+                time_window.to >= time_max_day) {
+                time_window = null;
+            }
+        }
+
+        function applyTimeSelection() {
+            normalizeWindow();
+            time_reset_elem.style.display = time_window ? 'block' : 'none';
+            drawHistogram();
+            updateTimeLabel();
+            /// Refresh the map in place so the previous image stays until the new data for
+            /// the changed time window arrives (no blink, no drop to a coarser layer).
+            layers.forEach(layer => { if (map.hasLayer(layer)) layer.refreshTiles(); });
+            if (photos_layer_active) photos_layer.redraw();
+            if (selected_box.length == 2) showReport();
+            updateHistory();
+        }
+
+        time_canvas.addEventListener('pointerdown', e => {
+            if (time_min_day === null) return;
+
+            const rect = time_canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+            const winFrom = time_window ? time_window.from : time_min_day;
+            const winTo = time_window ? time_window.to : time_max_day;
+            const xL = dayToX(winFrom, rect.width);
+            const xR = dayToX(winTo + 1, rect.width);
+            const dL = Math.abs(x - xL);
+            const dR = Math.abs(x - xR);
+
+            if (Math.min(dL, dR) <= 12) {
+                /// Grab the nearer existing handle.
+                time_drag = dL <= dR ? 'from' : 'to';
+                time_canvas.style.cursor = 'ew-resize';
+            } else if (time_window && x > xL && x < xR) {
+                /// Inside the selected window (away from the handles): drag it as a whole.
+                time_drag = 'move';
+                time_drag_anchor = xToDay(e.clientX);
+                time_drag_from0 = time_window.from;
+                time_drag_to0 = time_window.to;
+                time_canvas.style.cursor = 'grabbing';
+            } else {
+                /// Start a fresh selection from the clicked point.
+                const day = Math.max(time_min_day, Math.min(time_max_day, xToDay(e.clientX)));
+                time_window = { from: day, to: day };
+                time_drag = 'to';
+                time_canvas.style.cursor = 'ew-resize';
+            }
+
+            time_canvas.setPointerCapture(e.pointerId);
+            drawHistogram();
+            updateTimeLabel();
+            e.preventDefault();
+        });
+
+        /// Show the vertical cursor line and the date under the pointer.
+        function showTimeHover(clientX, rect) {
+            const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
+            time_hover_x = x;
+            const day = Math.max(time_min_day, Math.min(time_max_day, xToDay(clientX)));
+            time_hover_elem.textContent = dayToDateStr(day);
+            time_hover_elem.style.display = 'block';
+            /// The label is centered on the cursor; keep it fully within the chart so it
+            /// sticks to the border near the edges instead of overflowing (which would add
+            /// a horizontal scrollbar).
+            const half = time_hover_elem.offsetWidth / 2;
+            time_hover_elem.style.left = Math.max(half, Math.min(rect.width - half, x)) + 'px';
+        }
+
+        function hideTimeHover() {
+            if (time_hover_x === null) return;
+            time_hover_x = null;
+            time_hover_elem.style.display = 'none';
+            drawHistogram();
+        }
+
+        time_canvas.addEventListener('pointermove', e => {
+            if (time_min_day === null) return;
+
+            const rect = time_canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left;
+
+            showTimeHover(e.clientX, rect);
+
+            if (!time_drag) {
+                /// Not dragging: give the cursor a hint about what a drag here would do.
+                const winFrom = time_window ? time_window.from : time_min_day;
+                const winTo = time_window ? time_window.to : time_max_day;
+                const xL = dayToX(winFrom, rect.width);
+                const xR = dayToX(winTo + 1, rect.width);
+                if (Math.min(Math.abs(x - xL), Math.abs(x - xR)) <= 12) {
+                    time_canvas.style.cursor = 'ew-resize';
+                } else if (time_window && x > xL && x < xR) {
+                    time_canvas.style.cursor = 'grab';
+                } else {
+                    time_canvas.style.cursor = 'crosshair';
+                }
+                drawHistogram();
+                return;
+            }
+
+            if (time_drag === 'move') {
+                /// Shift the whole window, keeping its width, clamped to the range.
+                const width = time_drag_to0 - time_drag_from0;
+                const delta = xToDay(e.clientX) - time_drag_anchor;
+                let from = time_drag_from0 + delta;
+                let to = time_drag_to0 + delta;
+                if (from < time_min_day) { from = time_min_day; to = from + width; }
+                if (to > time_max_day) { to = time_max_day; from = to - width; }
+                time_window.from = from;
+                time_window.to = to;
+            } else {
+                let day = Math.max(time_min_day, Math.min(time_max_day, xToDay(e.clientX)));
+                if (!time_window) time_window = { from: time_min_day, to: time_max_day };
+
+                if (time_drag === 'from') time_window.from = day; else time_window.to = day;
+
+                if (time_window.from > time_window.to) {
+                    [time_window.from, time_window.to] = [time_window.to, time_window.from];
+                    time_drag = time_drag === 'from' ? 'to' : 'from';
+                }
+            }
+
+            time_reset_elem.style.display = 'block';
+            drawHistogram();
+            updateTimeLabel();
+            e.preventDefault();
+        });
+
+        function timeDragEnd(e) {
+            if (!time_drag) return;
+            const was_move = time_drag === 'move';
+            time_drag = null;
+            /// A 'grabbing' hand should relax back to 'grab' once released over the window.
+            time_canvas.style.cursor = was_move ? 'grab' : '';
+            applyTimeSelection();
+        }
+
+        time_canvas.addEventListener('pointerup', timeDragEnd);
+        time_canvas.addEventListener('pointercancel', timeDragEnd);
+
+        time_canvas.addEventListener('pointerleave', () => {
+            /// Keep the readout while an active drag continues outside the canvas.
+            if (!time_drag) hideTimeHover();
+        });
+
+        time_reset_elem.addEventListener('click', () => {
+            time_window = null;
+            applyTimeSelection();
+        });
+
+        /// Double-clicking the chart also resets the window to the full range.
+        time_canvas.addEventListener('dblclick', e => {
+            time_drag = null;
+            time_window = null;
+            applyTimeSelection();
+            e.preventDefault();
+        });
+
+        window.addEventListener('resize', () => {
+            if (config && config.time) drawHistogram();
+        });
+
         switchDataset('Planes');
 
         /// Restore from a saved link
@@ -815,6 +1414,13 @@
             if (params_dataset && params_dataset != dataset) {
                 switchDataset(params_dataset);
             }
+            /// Restore the time slider window (after the dataset switch, which resets it).
+            const tfrom = params.get('tfrom');
+            const tto = params.get('tto');
+            if (tfrom && tto) {
+                time_window = { from: dateStrToDay(tfrom), to: dateStrToDay(tto) };
+                time_reset_elem.style.display = 'block';
+            }
             const hash = params.get('query');
             if (hash) {
                 loadQuery(hash).then(query => {
@@ -833,6 +1439,7 @@
                 });
             } else {
                 map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
+                if (time_window) updateMap();
             }
             const box = params.get('box');
             if (box) {
@@ -876,6 +1483,9 @@
             ++report_sequence_num;
             const current_report_sequence_num = report_sequence_num;
 
+            /// Redraw the time chart for the selected area.
+            updateTimeSlider();
+
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
             document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
@@ -883,7 +1493,11 @@
             const current_query = query_elem.value;
 
             /// This is fairly dirty.
-            const condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
+            let condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
+
+            /// Apply the time slider window to the report queries as well.
+            const time_cond = getTimeCondition();
+            if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
@@ -1048,6 +1662,8 @@
             let picture = document.getElementById('picture');
             picture.style.display = 'none';
             picture.firstChild.src = '';
+            /// Selection cleared — restore the whole-dataset time chart.
+            updateTimeSlider();
         }
 
         function hideSelection() {
@@ -1317,11 +1933,15 @@
                 center: map.getCenter(),
                 query: text,
                 box: selected_box,
+                time: time_window,
             };
 
             let search = `?dataset=${dataset}&zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
             if (selected_box.length == 2) {
                 search += `&box=${selected_box[0].lat.toFixed(4)},${selected_box[0].lng.toFixed(4)},${selected_box[1].lat.toFixed(4)},${selected_box[1].lng.toFixed(4)}`;
+            }
+            if (time_window) {
+                search += `&tfrom=${dayToDateStr(time_window.from)}&tto=${dayToDateStr(time_window.to)}`;
             }
             history.replaceState(state, '', search);
         }
@@ -1333,7 +1953,10 @@
                 switchDataset(state.dataset);
             }
             query_elem.value = state.query;
+            time_window = state.time || null;
+            time_reset_elem.style.display = time_window ? 'block' : 'none';
             map.setView(state.center, state.zoom);
+            updateMap();
             if (state.box.length == 2) {
                 selected_box = state.box;
                 showReport();
