@@ -1414,6 +1414,10 @@
             if (params_dataset && params_dataset != dataset) {
                 switchDataset(params_dataset);
             }
+            /// Restore the base map visibility (eye button) state.
+            if (params.get('basemap') == '1') {
+                setBasemapVisible(true);
+            }
             /// Restore the time slider window (after the dataset switch, which resets it).
             const tfrom = params.get('tfrom');
             const tto = params.get('tto');
@@ -1908,16 +1912,19 @@
 
         /// Layers visibility toggle
 
-        document.getElementById('layers').addEventListener('click', e => {
-            const mode = base_layer.options.opacity < 0.5;
-
-            if (mode) {
+        function setBasemapVisible(visible) {
+            if (visible) {
                 base_layer.setOpacity(0.5);
                 base_layer.bringToFront();
             } else {
                 base_layer.setOpacity(0.1);
                 base_layer.bringToBack();
             }
+        }
+
+        document.getElementById('layers').addEventListener('click', e => {
+            setBasemapVisible(base_layer.options.opacity < 0.5);
+            updateHistory();
         });
 
         /// History support
@@ -1927,6 +1934,8 @@
             saveQuery(text);
             const query_hash = sipHash128(text);
 
+            const basemap_visible = base_layer.options.opacity >= 0.5;
+
             const state = {
                 dataset: dataset,
                 zoom: map.getZoom(),
@@ -1934,6 +1943,7 @@
                 query: text,
                 box: selected_box,
                 time: time_window,
+                basemap: basemap_visible,
             };
 
             let search = `?dataset=${dataset}&zoom=${state.zoom}&lat=${state.center.lat.toFixed(4)}&lng=${state.center.lng.toFixed(4)}&query=${query_hash}`;
@@ -1942,6 +1952,9 @@
             }
             if (time_window) {
                 search += `&tfrom=${dayToDateStr(time_window.from)}&tto=${dayToDateStr(time_window.to)}`;
+            }
+            if (basemap_visible) {
+                search += `&basemap=1`;
             }
             history.replaceState(state, '', search);
         }
@@ -1955,6 +1968,7 @@
             query_elem.value = state.query;
             time_window = state.time || null;
             time_reset_elem.style.display = time_window ? 'block' : 'none';
+            setBasemapVisible(!!state.basemap);
             map.setView(state.center, state.zoom);
             updateMap();
             if (state.box.length == 2) {
