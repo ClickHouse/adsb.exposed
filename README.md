@@ -452,7 +452,7 @@ const sql_types = `
     LIMIT 100`;
 ```
 
-The report is calculated for flight numbers, aircraft types, registration (tail numbers), and owners. You can click on any item and it will apply a filter to the main SQL query. For example, click on `A388` and it will show you a visualization for Airbus 380-800.
+The report is calculated for flight numbers, aircraft types, registration (tail numbers), and owners. You can click on any item and it will apply a filter to the main SQL query. For example, click on `A388` and it will show you a visualization for Airbus 380-800. While a filter is applied, it is displayed as a yellow slab on the right of the examples row, with a cross button to remove it — otherwise it is easy to forget that everything on the map is narrowed down by it.
 
 As a bonus, if you move the cursor over an aircraft type, it will go to Wikipedia API and try to find a picture of this aircraft. It often finds something else on Wikipedia, though.
 
