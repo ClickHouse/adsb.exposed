@@ -308,6 +308,39 @@
             font-weight: bold;
         }
 
+        /* The active filter: the conditions added to the example's own WHERE clause, either by
+           clicking a report item or by hand. It is highlighted in yellow, because it silently
+           affects everything on the map, and it is not a span, so that neither the example
+           selection loops nor the `.choices span` box styling treat it as an example. */
+        #active-filter {
+            display: none;
+            float: right;
+            padding: .25em .5em;
+            background: yellow;
+            border: solid 0.125em black;
+            color: black;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        #active-filter-text {
+            display: inline-block;
+            max-width: 30em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: bottom;
+            font-weight: bold;
+        }
+
+        #active-filter-clear {
+            padding-left: .5em;
+            cursor: pointer;
+        }
+
+        #active-filter-clear:hover {
+            color: #c00;
+        }
+
         #report {
             color: white;
             font-size: 12pt;
@@ -450,7 +483,7 @@
     <a id="proud" href="https://github.com/ClickHouse/ClickHouse">Proudly made with <b>ClickHouse</b> open-source database</a>
     <div id="datasets" class="choices"></div>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
-    <div id="examples" class="choices"></div>
+    <div id="examples" class="choices"><div id="active-filter">Filter: <b id="active-filter-text"></b><b id="active-filter-clear" title="Clear the filter">&times;</b></div></div>
     <div id="timeslider">
         <span id="timeslider-title">Time: <span id="timeslider-label"></span></span>
         <span id="timeslider-reset">Reset</span>
@@ -498,6 +531,8 @@
 
         let datasets_elem = document.getElementById('datasets');
         let examples_elem = document.getElementById('examples');
+        let active_filter_elem = document.getElementById('active-filter');
+        let active_filter_text_elem = document.getElementById('active-filter-text');
         let reports_elem = document.getElementById('report');
         let providers_elem = document.getElementById('provider');
 
@@ -595,6 +630,8 @@
             }
 
             examples_elem.append('Examples: ');
+            /// The row was just cleared; put the (floated) filter slab back into it.
+            examples_elem.append(active_filter_elem);
             Object.keys(queries).forEach((example, idx) => {
                 let span = document.createElement('span');
                 if (!idx) {
@@ -782,6 +819,7 @@
                 selected_example.classList.remove('selected');
             }
 
+            updateActiveFilter();
             updateTimeSlider();
 
             if (is3D) {
@@ -827,6 +865,65 @@
             if (!patch) return query;
             return query.replace(/(WHERE\s+.+?)\s*(GROUP\s+BY)/is, '$1 ' + patch + '\n$2');
         }
+
+        /// The conditions narrowing the example's own WHERE clause: either added by clicking
+        /// an item in the report (which marks them with a `/* Filter: */` comment), or typed
+        /// by hand. The marker is checked first, because it survives sharing a link, while
+        /// hand-written conditions can only be recognized by diffing with the example.
+        const filter_marker_re = /\/\*\s*Filter:\s*\*\/\s*AND\s+([\s\S]+?)\s*(?=GROUP\s+BY)/i;
+
+        function getActiveFilter() {
+            const marked = filter_marker_re.exec(query_elem.value);
+            if (marked) return marked[1];
+
+            if (last_selected_example && queries[last_selected_example]) {
+                const patch = getWherePatch(query_elem.value, queries[last_selected_example]);
+                if (patch) return patch.replace(/^AND\s+/i, '');
+            }
+
+            return null;
+        }
+
+        /// Show the active filter as a slab in the examples row, or hide the slab if the query
+        /// only has the example's own filters.
+        function updateActiveFilter() {
+            const filter = getActiveFilter();
+            if (filter === null) {
+                active_filter_elem.style.display = 'none';
+                return;
+            }
+            const text = filter.replace(/\s+/g, ' ');
+            active_filter_text_elem.textContent = text;
+            active_filter_elem.title = text;
+            active_filter_elem.style.display = 'inline-block';
+        }
+
+        /// Drop the active filter, keeping the rest of the query (including the user's edits
+        /// outside of the WHERE clause) as is.
+        function clearFilter() {
+            let query = query_elem.value.replace(filter_marker_re, '');
+
+            /// Hand-written conditions have no marker: restore the example's WHERE clause.
+            if (last_selected_example && queries[last_selected_example]) {
+                const original_where = extractWhereClause(queries[last_selected_example]);
+                if (original_where && getWherePatch(query, queries[last_selected_example])) {
+                    query = query.replace(/WHERE[\s\S]+?(GROUP\s+BY)/i,
+                        (match, group_by) => `WHERE ${original_where}\n${group_by}`);
+                }
+            }
+
+            setQuery(query);
+
+            /// The filter may have been the only difference from the example: highlight it again.
+            for (const example of examples_elem.querySelectorAll('span')) {
+                if (queries[example.textContent] === query) {
+                    example.classList.add('selected');
+                    last_selected_example = example.textContent;
+                }
+            }
+        }
+
+        document.getElementById('active-filter-clear').addEventListener('click', clearFilter);
 
         function setQuery(value) {
             query_elem.value = value;
