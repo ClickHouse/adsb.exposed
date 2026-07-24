@@ -308,6 +308,23 @@
             font-weight: bold;
         }
 
+        /// A per-report progress bar and stats line, driven by the live progress
+        /// packets of the JSONEachRowWithProgress reports. The green fill is drawn
+        /// behind the text so the query time stays readable while it advances.
+        #report_progress {
+            margin-bottom: 1em;
+            padding: 1px 4px;
+            min-height: 1.3em;
+            color: #ddd;
+            font-size: 10pt;
+            white-space: normal;
+            background:
+                linear-gradient(to right,
+                    rgba(40, 150, 90, 0.6) 0%,
+                    rgba(40, 150, 90, 0.6) var(--report-progress, 0%),
+                    rgba(255, 255, 255, 0.06) var(--report-progress, 0%));
+        }
+
         #picture {
             position: absolute;
             left: 1em;
@@ -563,6 +580,10 @@
                 examples_elem.append(span);
             }
 
+            const report_progress = document.createElement('div');
+            report_progress.id = 'report_progress';
+            reports_elem.append(report_progress);
+
             const report_total = document.createElement('div');
             report_total.id = 'report_total';
             reports_elem.append(report_total);
@@ -799,6 +820,86 @@
             });
 
             return Promise.any(requests);
+        }
+
+        function formatReadableSize(bytes) {
+            const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+            let value = bytes;
+            let i = 0;
+            while (value >= 1024 && i < units.length - 1) { value /= 1024; ++i; }
+            return `${value.toFixed(i ? 2 : 0)} ${units[i]}`;
+        }
+
+        /// Stream a query in the JSONEachRowWithProgress format and reconstruct a plain
+        /// object shaped like ClickHouse's JSON format ({data, rows, statistics}) so that
+        /// existing report consumers keep working unchanged. Progress packets are delivered
+        /// to `onProgress` as they arrive, which lets us drive a live progress bar and show
+        /// the elapsed query time once the query finishes.
+        async function fetchJSONEachRowWithProgress(urls, params, onProgress) {
+            const response = await fetchAny(urls, params);
+
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            const data = [];
+            let last_progress = null;
+            let exception = null;
+            /// Errors raised after the body already started are framed with an `__exception__`
+            /// marker line; once we see it, the rest of the stream is the message, not rows.
+            let marker_seen = false;
+            let marker_text = '';
+
+            function handleLine(line) {
+                const trimmed = line.replace(/\r$/, '');
+                if (marker_seen) { marker_text += trimmed + '\n'; return; }
+                if (trimmed === '__exception__') { marker_seen = true; return; }
+                if (trimmed.trim().length == 0) return;
+                let obj;
+                try { obj = JSON.parse(trimmed); } catch (e) { return; }
+                if (obj.progress) {
+                    last_progress = obj.progress;
+                    if (onProgress) onProgress(obj.progress);
+                } else if (obj.row !== undefined) {
+                    data.push(obj.row);
+                } else if (obj.exception !== undefined) {
+                    exception = obj.exception;
+                }
+                /// meta/totals/min/max are not used by the reports and are ignored.
+            }
+
+            while (true) {
+                let done, value;
+                try {
+                    ({ done, value } = await reader.read());
+                } catch (e) {
+                    /// After the `__exception__` block the server intentionally breaks the HTTP
+                    /// framing, so a network error here is expected — the message is buffered.
+                    if (marker_seen) break;
+                    throw e;
+                }
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop();
+                for (const line of lines) handleLine(line);
+            }
+            if (buffer.length) handleLine(buffer);
+
+            if (exception === null && marker_seen && marker_text.trim().length) {
+                exception = marker_text.trim();
+            }
+            if (exception !== null) throw new Error(exception);
+
+            return {
+                data,
+                rows: data.length,
+                statistics: {
+                    rows_read: last_progress ? +last_progress.read_rows : 0,
+                    bytes_read: last_progress ? +last_progress.read_bytes : 0,
+                    elapsed: last_progress ? +last_progress.elapsed_ns / 1e9 : 0,
+                },
+                progress: last_progress,
+            };
         }
 
         /// Rendering
@@ -1596,10 +1697,77 @@
             const time_cond = getTimeCondition();
             if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
+            /// Live progress/stats for the report. A report is several JSON queries running at
+            /// once (the totals plus one list per category); JSONEachRowWithProgress streams a
+            /// progress packet for each, which we aggregate into a single progress bar and a
+            /// stats line. This makes it visible — at conferences especially — that ClickHouse
+            /// really is running these queries in real time (see issue #40).
+            const report_progress_elem = document.getElementById('report_progress');
+            report_progress_elem.textContent = '';
+            report_progress_elem.style.setProperty('--report-progress', '0%');
+
+            const report_query_progress = {};
+            let report_queries_remaining = 1 + config.reports.length;
+
+            function refreshReportProgress(finished) {
+                if (current_report_sequence_num != report_sequence_num) return;
+
+                let read_rows = 0, read_bytes = 0, total_rows = 0, elapsed_ns = 0;
+                for (const key in report_query_progress) {
+                    const p = report_query_progress[key];
+                    read_rows += p.read_rows;
+                    read_bytes += p.read_bytes;
+                    total_rows += p.total_rows_to_read;
+                    /// The queries run concurrently, so the report's wall time is the slowest one.
+                    elapsed_ns = Math.max(elapsed_ns, p.elapsed_ns);
+                }
+
+                const pct = total_rows > 0 ? Math.min(100, 100 * read_rows / total_rows) : (finished ? 100 : 0);
+                report_progress_elem.style.setProperty('--report-progress', pct + '%');
+
+                let text;
+                if (finished) {
+                    text = `Elapsed: ${(elapsed_ns / 1e9).toFixed(3)} sec.`;
+                    if (read_rows > 0) {
+                        text += ` Processed ${read_rows.toLocaleString()} rows, ${formatReadableSize(read_bytes)}`;
+                        if (elapsed_ns > 0) {
+                            const rps = read_rows * 1e9 / elapsed_ns;
+                            const bps = read_bytes * 1e9 / elapsed_ns;
+                            text += ` (${Math.round(rps).toLocaleString()} rows/sec, ${formatReadableSize(bps)}/sec)`;
+                        }
+                    }
+                } else {
+                    text = `${pct.toFixed(1)}%`;
+                    if (read_rows > 0) text += ` — ${read_rows.toLocaleString()} rows`;
+                }
+                report_progress_elem.textContent = text;
+            }
+
+            /// Coerce a progress field to a finite number. Progress packets omit fields in
+            /// some cases — most notably `total_rows_to_read` is absent on query-cache hits
+            /// (which re-selecting an overlapping area triggers) — and `+undefined` is NaN,
+            /// which would otherwise poison the sums and render as "NaN%".
+            const num = v => { const n = +v; return Number.isFinite(n) ? n : 0; };
+
+            function reportQueryProgress(field, progress) {
+                report_query_progress[field] = {
+                    read_rows: num(progress.read_rows),
+                    read_bytes: num(progress.read_bytes),
+                    total_rows_to_read: num(progress.total_rows_to_read),
+                    elapsed_ns: num(progress.elapsed_ns),
+                };
+                refreshReportProgress(false);
+            }
+
+            function reportQueryFinished() {
+                if (current_report_sequence_num != report_sequence_num) return;
+                if (--report_queries_remaining <= 0) refreshReportProgress(true);
+            }
+
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
-                const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}` +
+                const url = host => `${host}/?user=website&default_format=JSONEachRowWithProgress&query_id=${query_id}` +
                     `&param_table=${levels[levels.length - 1].table}` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
@@ -1607,18 +1775,26 @@
                     `&param_bottom=${Math.max(selected_box[0].y, selected_box[1].y)}`;
 
                 progress_update_period = 1;
-                const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
 
-                if (!response.ok) {
-                    const text = await response.text();
+                try {
+                    return await fetchJSONEachRowWithProgress(
+                        hosts.map(host => url(host)),
+                        { method: 'POST', body: sql },
+                        progress => reportQueryProgress(field, progress));
+                } catch (error) {
+                    let text;
+                    if (error && error.errors) {
+                        try { text = await error.errors[0].payload.text(); } catch (e) { text = error.toString(); }
+                    } else {
+                        text = error && error.message ? error.message : String(error);
+                    }
                     if (!text.includes('QUERY_WAS_CANCELLED') && !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
                         showError(text);
                     }
-                    return;
+                    return undefined;
+                } finally {
+                    reportQueryFinished();
                 }
-
-                const json = await response.json();
-                return json;
             }
 
             async function findPicture(name) {
@@ -1688,7 +1864,7 @@
 
             function createList(condition, report) {
                 calculateReport(report.query(condition), report.field).then(json => {
-                    if (current_report_sequence_num != report_sequence_num) return;
+                    if (!json || current_report_sequence_num != report_sequence_num) return;
 
                     let elem = document.getElementById(report.id);
                     clearContainer(elem);
@@ -1752,6 +1928,7 @@
             }
 
             calculateReport(config.report_total.query(condition), "total").then(json => {
+                if (!json || current_report_sequence_num != report_sequence_num) return;
                 document.getElementById('report_total').textContent = config.report_total.content(json);
             });
 
