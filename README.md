@@ -169,6 +169,28 @@ But DC-3 is unanimously the best:
 ### [DC-3:](https://adsb.exposed/?zoom=9&lat=52.2244&lng=4.6732&query=0cb467701aab3ea9d81e9d45f9053a56&box=52.4999,5.4030,52.3978,5.5899)
 [![DC-3](pictures/dc3.png)](https://adsb.exposed/?zoom=9&lat=52.2244&lng=4.6732&query=0cb467701aab3ea9d81e9d45f9053a56&box=52.4999,5.4030,52.3978,5.5899)
 
+### OpenStreetMap
+
+The OSM dataset contains all 10.7 billion nodes of the planet. Untagged nodes trace the geometry of ways, so the density visualization draws the world map by itself:
+
+### [The world, drawn from nodes alone:](https://adsb.exposed/?dataset=OSM&zoom=4&lat=44.0000&lng=20.0000&query=a52c086e068150fe0d68d51271fc7b2a)
+[![OSM density](pictures/osm_density.png)](https://adsb.exposed/?dataset=OSM&zoom=4&lat=44.0000&lng=20.0000&query=a52c086e068150fe0d68d51271fc7b2a)
+
+### [Mapper territories (each contributor in their own color):](https://adsb.exposed/?dataset=OSM&zoom=6&lat=51.0000&lng=7.0000&query=090afb29117e806763c6ab6019e831c2)
+[![OSM mappers](pictures/osm_mappers.png)](https://adsb.exposed/?dataset=OSM&zoom=6&lat=51.0000&lng=7.0000&query=090afb29117e806763c6ab6019e831c2)
+
+### [The power grid of Germany:](https://adsb.exposed/?dataset=OSM&zoom=7&lat=51.0000&lng=10.0000&query=424999df6abf3944f7b4b174132bd815)
+[![OSM power grid](pictures/osm_power_grid.png)](https://adsb.exposed/?dataset=OSM&zoom=7&lat=51.0000&lng=10.0000&query=424999df6abf3944f7b4b174132bd815)
+
+### [Every street tree of Paris:](https://adsb.exposed/?dataset=OSM&zoom=13&lat=48.8600&lng=2.3500&query=2131ab350c5355bdf6a6128e116f1e8c)
+[![OSM trees](pictures/osm_trees_paris.png)](https://adsb.exposed/?dataset=OSM&zoom=13&lat=48.8600&lng=2.3500&query=2131ab350c5355bdf6a6128e116f1e8c)
+
+### [Street lamps of Berlin:](https://adsb.exposed/?dataset=OSM&zoom=12&lat=52.5200&lng=13.4000&query=4b36c02a3cfdb0be2f4db3772a272c30)
+
+### [Edit freshness of Europe (red = stale, green = recent):](https://adsb.exposed/?dataset=OSM&zoom=5&lat=52.0000&lng=5.0000&query=32c65d4da44952662d3009a3cd6a37a2)
+
+### [Railways of the Netherlands:](https://adsb.exposed/?dataset=OSM&zoom=9&lat=52.2000&lng=5.3000&query=c0973c7c2c80ea8621941b0378291a74)
+
 
 
 ## Data Source
@@ -182,6 +204,10 @@ We use the data from three sources: [ADSB.lol](https://www.adsb.lol/) (full hist
 and [ADSB-Exchange](https://www.adsbexchange.com/products/historical-data/) (only provides samples of data from first day of each month: around 1.2 billion records per day with better coverage).
 
 The data from [ADSB.lol](https://www.adsb.lol/), is made available under the [Open Database License (ODbL)](https://github.com/adsblol/globe_history_2024/blob/main/LICENSE-ODbL.txt).
+
+The website also hosts other datasets besides ADS-B: places (Foursquare), bird observations (eBird), geotagged photos (Flickr), ship traces (AIS), and OpenStreetMap.
+
+The OSM dataset contains every node of the planet (© OpenStreetMap contributors, [ODbL](LICENSE-ODbL.txt)), loaded from the weekly [ORC export on AWS Open Data](https://registry.opendata.aws/osm/). Untagged nodes are kept on purpose: they trace the geometry of ways, so a simple density visualization draws roads, buildings, and coastlines by itself. See [osm-setup.sql](osm-setup.sql) for the table structure and [prepare-osm.sh](prepare-osm.sh) for the loading pipeline — the data never touches the client: ClickHouse reads the ORC file directly from S3.
 
 ## Implementation Details
 
