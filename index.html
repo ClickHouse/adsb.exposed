@@ -277,6 +277,37 @@
             float: right;
         }
 
+        /* GitHub star counter, floated to the right of the 3D toggle. It is an <a>, and its
+           counter a <b>, not spans, so that neither the dataset-selection loops nor the
+           `.choices span` box styling of the row treat them as dataset choices. */
+        #github-stars {
+            float: right;
+            display: inline-block;
+            padding: .25em .5em;
+            background: #444;
+            border: solid 0.125em black;
+            color: white;
+            text-decoration: none;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        #github-stars:hover {
+            color: black;
+            background: yellow;
+        }
+
+        #github-stars svg {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            vertical-align: -0.125em;
+        }
+
+        #github-stars b {
+            font-weight: bold;
+        }
+
         #report {
             color: white;
             font-size: 12pt;
@@ -485,6 +516,45 @@
             });
             datasets_elem.append(span);
         });
+
+        /// GitHub star counter. Appended before the 3D toggle so that, both being floated
+        /// right, it ends up on the rightmost side of the datasets row. The count is fetched
+        /// from the GitHub API and cached in localStorage, so normal navigation doesn't hit
+        /// the (rate-limited) API on every page load.
+        let github_stars = document.createElement('a');
+        github_stars.id = 'github-stars';
+        github_stars.href = 'https://github.com/ClickHouse/adsb.exposed/';
+        github_stars.target = '_blank';
+        github_stars.rel = 'noopener noreferrer';
+        github_stars.title = 'Star adsb.exposed on GitHub';
+        github_stars.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg> Star <b id="github-stars-count"></b>`;
+        datasets_elem.append(github_stars);
+
+        (function() {
+            const repo = 'ClickHouse/adsb.exposed';
+            const cache_key = 'github-stars-' + repo;
+            const ttl = 6 * 3600 * 1000;
+            const count_elem = document.getElementById('github-stars-count');
+
+            try {
+                let cached = JSON.parse(localStorage.getItem(cache_key) || 'null');
+                if (cached && Date.now() - cached.t < ttl) {
+                    count_elem.textContent = cached.n;
+                    return;
+                }
+            } catch (e) {}
+
+            fetch(`https://api.github.com/repos/${repo}`)
+                .then(response => response.ok ? response.json() : null)
+                .then(data => {
+                    if (!data || typeof data.stargazers_count != 'number') return;
+                    count_elem.textContent = data.stargazers_count;
+                    try {
+                        localStorage.setItem(cache_key, JSON.stringify({ n: data.stargazers_count, t: Date.now() }));
+                    } catch (e) {}
+                })
+                .catch(() => {});
+        })();
 
         /// 3D globe toggle, on the right of the datasets row. Switching modes flips the
         /// ?3d URL parameter and reloads, so the choice is remembered in the link and the
