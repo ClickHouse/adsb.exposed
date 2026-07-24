@@ -96,6 +96,16 @@
             height: 100%;
             background: #111;
             image-rendering: pixelated;
+            position: relative;
+        }
+
+        /* The 3D globe overlays the Leaflet map, taking over its (grid-sized) area. */
+        #cesium {
+            display: none;
+            position: absolute;
+            inset: 0;
+            z-index: 1000;
+            image-rendering: auto;
         }
 
         .leaflet-fade-anim .leaflet-popup {
@@ -263,6 +273,10 @@
             color: #000;
         }
 
+        #toggle-3d {
+            float: right;
+        }
+
         #report {
             color: white;
             font-size: 12pt;
@@ -396,7 +410,7 @@
         <span id="timeslider-hover"></span>
     </div>
     <div id="stats"></div>
-    <div id="map"><div id="selection"></div></div>
+    <div id="map"><div id="selection"></div><div id="cesium"></div></div>
     <div id="report"></div>
     <div id="picture"><img/><span id="picture-copyright">Picture from Wikipedia, &copy; the details at the corresponding page.</span></div>
     <div id="error"><span id="error-close" title="Close">&times;</span><span id="error-text"></span></div>
@@ -414,6 +428,13 @@
         let config;
         let queries;
         let levels;
+
+        /// Experimental 3D globe mode (CesiumJS), hidden behind ?3d=1. See the block
+        /// near the end of this script. When active, the density tiles are draped over
+        /// a real sphere instead of a flat Mercator plane.
+        const is3D = new URLSearchParams(window.location.search).get('3d') == '1';
+        let cesiumViewer = null;
+        let cesiumDensityLayer = null;
 
         function showError(text) {
             let err = document.getElementById('error');
@@ -439,6 +460,7 @@
             span.append(document.createTextNode(dataset_name));
             span.addEventListener('click', e => {
                 for (other of document.querySelectorAll('#datasets span')) {
+                    if (other.id === 'toggle-3d') continue;   /// Not a dataset choice.
                     other.classList.remove('selected');
                 }
                 e.target.classList.add('selected');
@@ -446,6 +468,20 @@
             });
             datasets_elem.append(span);
         });
+
+        /// 3D globe toggle, on the right of the datasets row. Switching modes flips the
+        /// ?3d URL parameter and reloads, so the choice is remembered in the link and the
+        /// app re-initialises cleanly in the chosen mode.
+        let toggle_3d = document.createElement('span');
+        toggle_3d.id = 'toggle-3d';
+        toggle_3d.append(document.createTextNode('🌐 3D'));
+        if (is3D) toggle_3d.classList.add('selected');
+        toggle_3d.addEventListener('click', () => {
+            const params = new URLSearchParams(window.location.search);
+            if (is3D) params.delete('3d'); else params.set('3d', '1');
+            window.location.search = params.toString();
+        });
+        datasets_elem.append(toggle_3d);
 
         function clearContainer(elem) {
             while (elem.firstChild) elem.removeChild(elem.firstChild);
@@ -464,6 +500,7 @@
             clearContainer(providers_elem);
 
             for (other of datasets_elem.querySelectorAll('span')) {
+                if (other.id === 'toggle-3d') continue;   /// Not a dataset choice.
                 other.classList.remove('selected');
                 if (dataset == other.innerText) {
                     other.classList.add('selected');
@@ -511,7 +548,11 @@
                 span.append(document.createTextNode('🖼️'));
                 span.addEventListener('click', e => {
                     e.target.classList.toggle('selected');
-                    if (e.target.classList.contains('selected')) {
+                    const on = e.target.classList.contains('selected');
+                    if (is3D) {
+                        cesiumPhotosActive = on;
+                        cesiumUpdatePhotos();
+                    } else if (on) {
                         photos_layer.addTo(map);
                         photos_layer_active = true;
                     } else {
@@ -570,7 +611,8 @@
                 layers.push(new L.GridLayer.ClickHouse(options));
             });
 
-            layers[0].addTo(map);
+            /// In 3D mode the density tiles are drawn by Cesium, not Leaflet.
+            if (!is3D) layers[0].addTo(map);
             layers[0].on('loading', e => {
                 layers.forEach((layer, idx) => {
                     if (idx) { layer.removeFrom(map); }
@@ -614,7 +656,9 @@
             center: [52.3676, 4.9041],
             zoom: 5,
             worldCopyJump: true,
-            layers: [base_layer],
+            /// In 3D mode the Leaflet map is only kept for camera/URL state; don't
+            /// load its raster base (Cesium draws its own).
+            layers: is3D ? [] : [base_layer],
             /// Avoid fading tiles in/out so refreshed data replaces the old image cleanly.
             fadeAnimation: false
         });
@@ -649,9 +693,13 @@
 
             updateTimeSlider();
 
-            layers[0]?.redraw();
-            if (photos_layer_active) {
-                photos_layer.redraw();
+            if (is3D) {
+                cesiumRefresh();
+            } else {
+                layers[0]?.redraw();
+                if (photos_layer_active) {
+                    photos_layer.redraw();
+                }
             }
             if (selected_box.length == 2) showReport();
         }
@@ -770,55 +818,68 @@
             ctx.putImageData(image, 0, 0, 0, 0, 1024, 1024);
         }
 
+        /// Surface a failed tile query to the user, unless it is an expected
+        /// cancellation caused by a newer request superseding an in-flight one.
+        async function reportTileError(error) {
+            let text;
+            if (error.errors) {
+                text = await error.errors[0].payload.text();
+            } else {
+                console.log(error);
+                text = error.toString();
+            }
+            if (!text.includes('QUERY_WAS_CANCELLED') &&
+                !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
+                showError(text);
+            }
+        }
+
+        /// Fetch the raw 1024x1024 RGBA buffer for one tile from ClickHouse, using the
+        /// shared per-query tile cache. Throws on error; the caller decides how to
+        /// surface it. Shared by the 2D (Leaflet) and 3D (Cesium) rendering paths.
+        async function fetchTileBuffer(level, coords, sql) {
+            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
+
+            if (!config.disable_cache) {
+                if (!cached_tiles[key]) cached_tiles[key] = [];
+                const cached = cached_tiles[key][level.priority];
+                if (cached) return cached;
+            }
+
+            ++query_sequence_num;
+            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
+            const hosts = getHosts(key);
+            const url = host => `${host}/?user=website&default_format=RowBinary` +
+                (config.disable_cache ? '&use_query_cache=0' : '') +
+                `&query_id=${query_id}&replace_running_query=1` +
+                `&param_table=${level.table}&param_sampling=${level.sample}` +
+                `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
+
+            progress_update_period = 1;
+
+            const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
+            const buf = await response.arrayBuffer();
+            if (!config.disable_cache) {
+                if (!cached_tiles[key]) cached_tiles[key] = [];
+                cached_tiles[key][level.priority] = buf;
+            }
+            return buf;
+        }
+
         async function render(level, coords, tile) {
             /// Each render of a given tile element bumps a token; a slower, superseded
             /// request must not overwrite the tile drawn by a newer one.
             const token = tile._renderToken = (tile._renderToken || 0) + 1;
 
             const sql = applyTimeWindow(query_elem.value);
-            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
             const coord_key = `${level.table}-${coords.z}-${coords.x}-${coords.y}`;
 
             let buf;
-            if (!config.disable_cache) {
-                if (!cached_tiles[key]) cached_tiles[key] = [];
-                buf = cached_tiles[key][level.priority];
-            }
-
-            if (!buf) {
-                ++query_sequence_num;
-                const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
-                const hosts = getHosts(key);
-                const url = host => `${host}/?user=website&default_format=RowBinary` +
-                    (config.disable_cache ? '&use_query_cache=0' : '') +
-                    `&query_id=${query_id}&replace_running_query=1` +
-                    `&param_table=${level.table}&param_sampling=${level.sample}` +
-                    `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
-
-                progress_update_period = 1;
-
-                try {
-                    const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
-                    buf = await response.arrayBuffer();
-                    if (!config.disable_cache) {
-                        if (!cached_tiles[key]) cached_tiles[key] = [];
-                        cached_tiles[key][level.priority] = buf;
-                    }
-                } catch (error) {
-                    let text;
-                    if (error.errors) {
-                        const response = error.errors[0].payload;
-                        text = await response.text();
-                    } else {
-                        console.log(error);
-                        text = error.toString();
-                    }
-                    if (!text.includes('QUERY_WAS_CANCELLED') &&
-                        !text.includes('QUERY_WITH_SAME_ID_IS_ALREADY_RUNNING')) {
-                        showError(text);
-                    }
-                    return;
-                }
+            try {
+                buf = await fetchTileBuffer(level, coords, sql);
+            } catch (error) {
+                reportTileError(error);
+                return;
             }
 
             /// A newer render for this tile has started; don't overwrite it with stale data.
@@ -1266,8 +1327,12 @@
             updateTimeLabel();
             /// Refresh the map in place so the previous image stays until the new data for
             /// the changed time window arrives (no blink, no drop to a coarser layer).
-            layers.forEach(layer => { if (map.hasLayer(layer)) layer.refreshTiles(); });
-            if (photos_layer_active) photos_layer.redraw();
+            if (is3D) {
+                cesiumRefresh();
+            } else {
+                layers.forEach(layer => { if (map.hasLayer(layer)) layer.refreshTiles(); });
+                if (photos_layer_active) photos_layer.redraw();
+            }
             if (selected_box.length == 2) showReport();
             updateHistory();
         }
@@ -1702,6 +1767,9 @@
         });
 
         function selectStart(e) {
+            /// Box selection reads Leaflet coordinates, which are meaningless while the
+            /// Cesium globe is shown. Disabled in 3D until selection is wired to Cesium.
+            if (is3D) return;
             if (e.button !== 2 && !select_toggle_active) return;
 
             const rect = map_elem.getBoundingClientRect();
@@ -1728,6 +1796,11 @@
         map_elem.addEventListener('touchstart', e => e.preventDefault());
 
         function selectMove(e) {
+            /// In 3D the Cesium globe covers the (hidden) Leaflet map, so pointer moves
+            /// over the globe would feed garbage Leaflet coordinates into the usage
+            /// stats and box selection. Neither is wired for the globe yet — skip them.
+            if (is3D) return;
+
             const rect = map_elem.getBoundingClientRect();
             const x = e.clientX - rect.x;
             const y = e.clientY - rect.y;
@@ -1958,10 +2031,23 @@
 
             const basemap_visible = base_layer.options.opacity >= 0.5;
 
+            /// In 3D the user navigates the Cesium camera, not the (hidden) Leaflet map,
+            /// so read the view from the camera. Zoom uses the same height↔zoom relation
+            /// as the camera setup in initCesium, so shared links round-trip.
+            let center, zoom;
+            if (is3D && cesiumViewer) {
+                const carto = cesiumViewer.camera.positionCartographic;
+                center = { lat: Cesium.Math.toDegrees(carto.latitude), lng: Cesium.Math.toDegrees(carto.longitude) };
+                zoom = +Math.log2(4e7 / Math.max(carto.height, 1)).toFixed(2);
+            } else {
+                center = map.getCenter();
+                zoom = map.getZoom();
+            }
+
             const state = {
                 dataset: dataset,
-                zoom: map.getZoom(),
-                center: map.getCenter(),
+                zoom: zoom,
+                center: center,
                 query: text,
                 box: selected_box,
                 time: time_window,
@@ -1977,6 +2063,9 @@
             }
             if (basemap_visible) {
                 search += `&basemap=1`;
+            }
+            if (is3D) {
+                search += `&3d=1`;   /// Keep the 3D choice in the link across navigation.
             }
             history.replaceState(state, '', search);
         }
@@ -2020,6 +2109,475 @@
                 selection.style.height = (point1.y - point0.y) + 'px';
             }
         });
+
+        /// -------------------------------------------------------------------------
+        /// Experimental 3D globe mode (CesiumJS), hidden behind ?3d=1.
+        ///
+        /// It reuses the exact same ClickHouse density tiles as the 2D view — served
+        /// as a custom Cesium imagery layer — so every dataset, query and time filter
+        /// keeps working. Draping the Mercator-computed tiles back onto a sphere also
+        /// corrects the high-latitude density distortion of the flat map (issue #4):
+        /// tiles that Mercator stretches near the poles get compressed again on the
+        /// globe, restoring a faithful sense of density.
+        ///
+        /// Cesium is heavy, so it is loaded lazily only when the parameter is present;
+        /// normal 2D visitors never download it.
+        /// -------------------------------------------------------------------------
+
+        /// Served from cdnjs (a single Cloudflare origin with CORS and no redirects).
+        /// Cesium's own download CDN cross-origin-redirects the Web Worker scripts,
+        /// which browsers refuse ("cross-origin redirects of the top-level worker").
+        const CESIUM_VERSION = '1.118.0';
+        const CESIUM_BASE = `https://cdnjs.cloudflare.com/ajax/libs/cesium/${CESIUM_VERSION}/`;
+
+        let cesiumOsmLayer = null;
+        let cesiumLevel = 2;   /// The single, uniform imagery level currently in use.
+        let cesiumPhotosActive = false;     /// Photos overlay toggle state in 3D.
+        let cesiumPhotoEntities = [];       /// Currently shown photo billboards.
+        let cesiumPhotosTimer = null;       /// Debounce for photo refetches on camera move.
+
+        /// Build an HTMLCanvasElement from a raw 1024x1024 RGBA tile buffer, matching
+        /// drawTileBuffer (same display-p3 color space). Cesium accepts a canvas as a
+        /// tile image directly.
+        function bufToTileCanvas(buf) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024;
+            canvas.height = 1024;
+            const ctx = canvas.getContext('2d');
+            const image = ctx.createImageData(1024, 1024, {colorSpace: 'display-p3'});
+            image.data.set(new Uint8ClampedArray(buf));
+            ctx.putImageData(image, 0, 0);
+            return canvas;
+        }
+
+        /// The finest sampling table worth loading at a given tile level — heavily
+        /// sampled (cheap) tables suffice when zoomed out; full detail up close. The
+        /// progressive load walks from the coarsest table up to this one.
+        function cesiumMaxSamplingIndex(z) {
+            const idx = z <= 3 ? 0 : z <= 6 ? 1 : levels.length - 1;
+            return Math.min(idx, levels.length - 1);
+        }
+
+        /// A Cesium ImageryProvider backed by the ClickHouse density tiles for one
+        /// sampling table. Cesium's WebMercatorTilingScheme uses one 1024px tile at
+        /// level 0 and 2^L tiles at level L — exactly the tiling ClickHouse expects via
+        /// param_z/x/y — so a Cesium level maps directly to ClickHouse's param_z (which
+        /// is coords.z - 2, hence z = level + 2 below).
+        function makeDensityImageryProvider(samplingLevel) {
+            const tilingScheme = new Cesium.WebMercatorTilingScheme();
+            /// Freeze the query for this provider instance; cesiumRefresh() creates a
+            /// fresh instance whenever the query or time window changes.
+            const sql = applyTimeWindow(query_elem.value);
+
+            /// When a tile's query fails (a busy endpoint, an aborted request), ask
+            /// Cesium to re-request it a few times before giving up. Otherwise the
+            /// coarse parent tile stays on screen for good, looking low quality — the
+            /// finer level never gets loaded.
+            const errorEvent = new Cesium.Event();
+            errorEvent.addEventListener(error => {
+                if (error.timesRetried < 5) {
+                    error.retry = true;
+                } else if (error.error) {
+                    reportTileError(error.error);
+                }
+            });
+
+            return {
+                tileWidth: 1024,
+                tileHeight: 1024,
+                /// Uniform level of detail across the whole globe: with minimum ==
+                /// maximum, Cesium clamps every terrain tile to this one imagery level,
+                /// so detail is consistent instead of finer near the camera and coarser
+                /// toward the horizon. The level tracks the camera height — see
+                /// cesiumTargetLevel / cesiumUpdateLevel.
+                minimumLevel: cesiumLevel,
+                maximumLevel: cesiumLevel,
+                tilingScheme: tilingScheme,
+                rectangle: tilingScheme.rectangle,
+                errorEvent: errorEvent,
+                credit: new Cesium.Credit(`© Alexey Milovidov, ClickHouse, Inc. (data: ${config.notice})`),
+                hasAlphaChannel: true,
+                proxy: undefined,
+                tileDiscardPolicy: undefined,
+                getTileCredits: function() { return undefined; },
+                pickFeatures: function() { return undefined; },
+                requestImage: async function(x, y, level, request) {
+                    const coords = { z: level + 2, x: x, y: y };
+                    /// Throw on failure so Cesium's retry (errorEvent above) kicks in
+                    /// instead of caching a blank tile.
+                    const buf = await fetchTileBuffer(samplingLevel, coords, sql);
+                    hideError();
+                    return bufToTileCanvas(buf);
+                }
+            };
+        }
+
+        /// Run `callback` once the globe's tile queue has done some work and then
+        /// drained — i.e. the tiles requested just now have loaded. The `started` guard
+        /// stops an already-idle queue from firing immediately; a timeout is a fallback
+        /// so nothing waits forever.
+        function cesiumWhenTilesLoaded(callback) {
+            const globe = cesiumViewer.scene.globe;
+            let started = false;
+            const done = () => {
+                globe.tileLoadProgressEvent.removeEventListener(onProgress);
+                clearTimeout(fallback);
+                callback();
+            };
+            const onProgress = queued => {
+                if (queued > 0) started = true;
+                else if (started) done();
+            };
+            globe.tileLoadProgressEvent.addEventListener(onProgress);
+            const fallback = setTimeout(done, 5000);
+        }
+
+        /// Restart the density load. Like the 2D map, it loads iteratively: the coarsest
+        /// (most heavily sampled, cheapest) table first for instant feedback, then each
+        /// finer table in turn up to the detail the current zoom warrants. Each step is
+        /// drawn on top and the previous one is kept underneath until the new tiles have
+        /// loaded, so it refines in place without blinking. A generation counter cancels
+        /// an in-flight sequence when the query, time window or zoom level changes.
+        let cesiumLoadGen = 0;
+        function cesiumRefresh() {
+            if (!cesiumViewer) return;
+            cesiumLoadSampling(++cesiumLoadGen, 0);
+            /// A query or time-window change also changes which photos are on top.
+            cesiumUpdatePhotos();
+        }
+
+        function cesiumLoadSampling(gen, idx) {
+            if (!cesiumViewer || gen !== cesiumLoadGen || idx > cesiumMaxSamplingIndex(cesiumLevel)) return;
+
+            const layers = cesiumViewer.imageryLayers;
+            const samplingLevel = levels[idx];
+            const previous = cesiumDensityLayer;
+
+            const layer = new Cesium.ImageryLayer(makeDensityImageryProvider(samplingLevel), {
+                /// Only drape the uniform-level density on terrain tiles that are at
+                /// least this detailed. Otherwise a coarse (e.g. root) terrain tile,
+                /// which spans a huge area, would pull in the entire complement of
+                /// fine imagery tiles for its span — requesting the whole globe at once.
+                minimumTerrainLevel: cesiumLevel,
+            });
+            layers.add(layer);   /// New sampling step sits on top of the previous one.
+            /// The density tiles are data rasters, not photos — sample them without
+            /// smoothing when magnified, so they stay crisp like the 2D map's
+            /// image-rendering: pixelated instead of blurring between data points.
+            layer.magnificationFilter = Cesium.TextureMagnificationFilter.NEAREST;
+            cesiumDensityLayer = layer;
+
+            /// Colour the progress bar by the sampling table being loaded, like the 2D
+            /// map (whose Leaflet load events — which set these — never fire in 3D).
+            document.documentElement.style.setProperty('--progress-background-color', `var(--progress-background-color${samplingLevel.priority})`);
+            document.documentElement.style.setProperty('--progress-foreground-color', `var(--progress-foreground-color${samplingLevel.priority})`);
+
+            cesiumWhenTilesLoaded(() => {
+                /// Drop the now-covered previous step (a coarser sample or a stale layer
+                /// from a superseded sequence).
+                if (previous && layers.contains(previous)) layers.remove(previous, true);
+                if (gen === cesiumLoadGen) {
+                    cesiumLoadSampling(gen, idx + 1);   /// Refine to the next finer table.
+                } else if (layers.contains(layer)) {
+                    layers.remove(layer, true);         /// Superseded; discard this step.
+                }
+            });
+        }
+
+        /// The imagery level appropriate for the current camera height, so that one
+        /// on-screen tile is roughly one tile's worth of the view. This single level is
+        /// applied uniformly across the globe (see makeDensityImageryProvider).
+        function cesiumTargetLevel(scene) {
+            const worldMeters = 2 * Math.PI * 6378137;
+            const height = Math.max(scene.camera.positionCartographic.height, 1);
+            /// tile ground size at level L (1024px tiles) = worldMeters / 2^L; pick L so
+            /// that size ≈ the view's ground span (∝ camera height, scaled by pixels).
+            const level = Math.round(Math.log2(worldMeters * scene.canvas.height / (1024 * height)));
+            return Math.max(0, Math.min(16, level));
+        }
+
+        /// Rebuild the density layer at a new uniform level when the camera has zoomed
+        /// enough to warrant it. Panning at the same level does nothing.
+        function cesiumUpdateLevel(scene) {
+            const level = cesiumTargetLevel(scene);
+            if (level !== cesiumLevel) {
+                cesiumLevel = level;
+                cesiumRefresh();
+            }
+        }
+
+        /// Inverse of latlngToMercator: 32-bit Web-Mercator integers back to lon/lat.
+        function mercatorToLatLng(x, y) {
+            const lng = x / 0xFFFFFFFF * 360 - 180;
+            const latRad = 2 * Math.atan(Math.exp((1 - 2 * y / 0xFFFFFFFF) * Math.PI)) - Math.PI / 2;
+            return { lat: latRad * 180 / Math.PI, lng: lng };
+        }
+
+        /// Photos overlay for the globe: the Leaflet photo tiles can't be shown on the
+        /// sphere, so instead we fetch the top photos in the current view and place them
+        /// as fixed-size billboards at their real locations. Debounced on camera moves.
+        function cesiumUpdatePhotos() {
+            if (cesiumPhotosTimer) { clearTimeout(cesiumPhotosTimer); cesiumPhotosTimer = null; }
+
+            function clearPhotos() {
+                cesiumPhotoEntities.forEach(e => cesiumViewer.entities.remove(e));
+                cesiumPhotoEntities = [];
+            }
+
+            if (!cesiumViewer || !cesiumPhotosActive) { clearPhotos(); return; }
+
+            cesiumPhotosTimer = setTimeout(async () => {
+                /// Visible lon/lat box → Mercator bounds for the query.
+                const rect = cesiumViewer.camera.computeViewRectangle(cesiumViewer.scene.globe.ellipsoid)
+                    || Cesium.Rectangle.MAX_VALUE;
+                const nw = latlngToMercator({ lat: Cesium.Math.toDegrees(rect.north), lng: Cesium.Math.toDegrees(rect.west) });
+                const se = latlngToMercator({ lat: Cesium.Math.toDegrees(rect.south), lng: Cesium.Math.toDegrees(rect.east) });
+
+                /// Reuse the current query's WHERE (referencing in_tile), with in_tile
+                /// defined as the visible box — same shape as the report queries.
+                let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+                const time_cond = getTimeCondition();
+                if (time_cond) condition = `(${condition}) AND ${time_cond}`;
+
+                const sql = `WITH
+                    mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT mercator_x, mercator_y, url_sq AS src
+                    FROM flickr_mercator
+                    WHERE ${condition} AND has(sizes, 'k')
+                    ORDER BY count_faves DESC, count_views DESC
+                    LIMIT 60`;
+
+                ++query_sequence_num;
+                const query_id = `${uuid}-${query_sequence_num}-flickr_photos`;
+                const hosts = getHosts('photos');
+                const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}&replace_running_query=1` +
+                    `&param_left=${Math.min(nw.x, se.x)}&param_right=${Math.max(nw.x, se.x)}` +
+                    `&param_top=${Math.min(nw.y, se.y)}&param_bottom=${Math.max(nw.y, se.y)}`;
+
+                progress_update_period = 1;
+
+                let rows;
+                try {
+                    const response = await fetchAny(hosts.map(host => url(host)), { method: 'POST', body: sql });
+                    rows = (await response.json()).data;
+                } catch (error) {
+                    reportTileError(error);
+                    return;
+                }
+
+                if (!cesiumPhotosActive) return;   /// Toggled off while loading.
+                clearPhotos();
+                rows.forEach(row => {
+                    const ll = mercatorToLatLng(+row.mercator_x, +row.mercator_y);
+                    cesiumPhotoEntities.push(cesiumViewer.entities.add({
+                        position: Cesium.Cartesian3.fromDegrees(ll.lng, ll.lat),
+                        billboard: {
+                            image: row.src,
+                            width: 48,
+                            height: 48,
+                            /// Keep thumbnails visible on top of the globe, not clipped.
+                            disableDepthTestDistance: Number.POSITIVE_INFINITY,
+                        },
+                    }));
+                });
+                hideError();
+            }, 400);
+        }
+
+        function initCesium() {
+            const container = document.getElementById('cesium');
+            container.style.display = 'block';
+
+            cesiumViewer = new Cesium.Viewer(container, {
+                baseLayer: false,
+                baseLayerPicker: false,
+                geocoder: false,
+                homeButton: false,
+                sceneModePicker: false,
+                navigationHelpButton: false,
+                animation: false,
+                timeline: false,
+                fullscreenButton: false,
+                infoBox: false,
+                selectionIndicator: false,
+                terrainProvider: new Cesium.EllipsoidTerrainProvider(),
+                /// Render at the display's native pixel ratio; the default (CSS pixels)
+                /// looks blurry on HiDPI/retina screens.
+                useBrowserRecommendedResolution: false,
+            });
+
+            /// Dark, minimal styling to match the rest of the app.
+            const scene = cesiumViewer.scene;
+            scene.backgroundColor = Cesium.Color.fromCssColorString('#101213');
+            scene.globe.baseColor = Cesium.Color.fromCssColorString('#101213');
+            scene.skyBox.show = false;
+            scene.sun.show = false;
+            scene.moon.show = false;
+            scene.globe.showGroundAtmosphere = false;
+            scene.skyAtmosphere.show = false;   /// No atmospheric glow around the limb.
+            scene.fog.enabled = false;
+
+            /// Free the right mouse button for selection: zoom stays on the wheel and
+            /// pinch, but not right-drag (a Cesium default).
+            scene.screenSpaceCameraController.zoomEventTypes = [
+                Cesium.CameraEventType.WHEEL,
+                Cesium.CameraEventType.PINCH,
+            ];
+
+            /// Faint OSM underlay for geographic context, like the 2D map's base layer.
+            cesiumOsmLayer = cesiumViewer.imageryLayers.addImageryProvider(
+                new Cesium.UrlTemplateImageryProvider({
+                    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                    credit: '© OpenStreetMap',
+                    maximumLevel: 19,
+                }));
+            cesiumOsmLayer.alpha = 0.15;
+
+            /// If a shared link points at a location, fly there; otherwise keep
+            /// Cesium's whole-globe view as the landing for a bare ?3d=1. Read from
+            /// the URL directly so a saved query (restored asynchronously) doesn't
+            /// race the camera setup.
+            const params = new URLSearchParams(window.location.search);
+            const lat = parseFloat(params.get('lat'));
+            const lng = parseFloat(params.get('lng'));
+            if (Number.isFinite(lat) && Number.isFinite(lng)) {
+                const zoom = parseFloat(params.get('zoom'));
+                const height = 4e7 / Math.pow(2, Number.isFinite(zoom) ? zoom : 5);
+                cesiumViewer.camera.setView({
+                    destination: Cesium.Cartesian3.fromDegrees(lng, lat, height),
+                });
+            }
+
+            /// Pick the uniform level for the initial view and build the density layer,
+            /// then re-evaluate it whenever the camera zooms enough to matter.
+            cesiumLevel = cesiumTargetLevel(scene);
+            cesiumRefresh();
+            scene.camera.percentageChanged = 0.2;
+            scene.camera.changed.addEventListener(() => {
+                cesiumUpdateLevel(scene);
+                cesiumUpdatePhotos();
+            });
+            /// Persist the camera view to the URL when movement ends (like the 2D map's
+            /// moveend), so the link reflects and restores the actual 3D view.
+            cesiumViewer.camera.moveEnd.addEventListener(updateHistory);
+
+            /// Let the 👁 toggle also brighten the OSM underlay in 3D.
+            document.getElementById('layers').addEventListener('click', () => {
+                if (cesiumOsmLayer) cesiumOsmLayer.alpha = cesiumOsmLayer.alpha < 0.5 ? 0.6 : 0.15;
+            });
+
+            /// Clicking the globe dismisses the query editor, like clicking the 2D map
+            /// (whose focus handler never fires because Cesium covers its container).
+            scene.canvas.addEventListener('pointerdown', collapseQueryEditor);
+
+            setupCesiumSelection(scene);
+        }
+
+        /// Right-drag a rectangle on the globe to select a region and open its report,
+        /// mirroring the 2D box selection. Corner coordinates come from picking the
+        /// globe surface; right-drag is free because we removed it from the camera's
+        /// zoom event types. A selection box in Mercator is bounded by constant
+        /// longitude/latitude lines — i.e. a geographic rectangle — so it is drawn as a
+        /// globe entity that curves correctly on the sphere and tracks the camera.
+        function setupCesiumSelection(scene) {
+            const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
+            let startCarto = null;     /// Cartographic where the drag began, or null.
+            let startPx = null;        /// Canvas pixel where the drag began.
+            let rectangle = null;      /// Current Cesium.Rectangle (radians), or null.
+
+            /// Suppress the browser context menu so right-drag selection is usable.
+            scene.canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+            /// One reusable entity; a CallbackProperty lets it update smoothly during
+            /// the drag without rebuilding the geometry.
+            cesiumViewer.entities.add({
+                rectangle: {
+                    coordinates: new Cesium.CallbackProperty(() => rectangle, false),
+                    material: Cesium.Color.WHITE.withAlpha(0.2),
+                    outline: true,
+                    outlineColor: Cesium.Color.WHITE,
+                    height: 0,
+                },
+            });
+
+            function pickCarto(px) {
+                const cartesian = scene.camera.pickEllipsoid(px, scene.globe.ellipsoid);
+                return cartesian ? Cesium.Cartographic.fromCartesian(cartesian) : null;
+            }
+
+            function setRectangle(a, b) {
+                rectangle = new Cesium.Rectangle(
+                    Math.min(a.longitude, b.longitude), Math.min(a.latitude, b.latitude),
+                    Math.max(a.longitude, b.longitude), Math.max(a.latitude, b.latitude));
+            }
+
+            function toLatLng(carto) {
+                return { lat: Cesium.Math.toDegrees(carto.latitude), lng: Cesium.Math.toDegrees(carto.longitude) };
+            }
+
+            handler.setInputAction(e => {
+                const c = pickCarto(e.position);
+                if (!c) return;              /// Ignore drags that start off the globe.
+                startCarto = c;
+                startPx = e.position.clone();
+                setRectangle(c, c);
+            }, Cesium.ScreenSpaceEventType.RIGHT_DOWN);
+
+            handler.setInputAction(e => {
+                if (!startCarto) return;
+                const c = pickCarto(e.endPosition);
+                if (c) setRectangle(startCarto, c);
+            }, Cesium.ScreenSpaceEventType.MOUSE_MOVE);
+
+            handler.setInputAction(e => {
+                if (!startCarto) return;
+                const a = startCarto;
+                const downPx = startPx;
+                startCarto = null;
+
+                /// A right-click (no meaningful drag) closes the report instead of
+                /// selecting a degenerate region.
+                if (Cesium.Cartesian2.distance(downPx, e.position) < 5) {
+                    rectangle = null;
+                    selected_box = [];
+                    hideSelection();
+                    return;
+                }
+
+                const b = pickCarto(e.position);
+                if (!b) return;
+                setRectangle(a, b);
+                selected_box = [latlngToMercator(toLatLng(a)), latlngToMercator(toLatLng(b))];
+                showReport();
+            }, Cesium.ScreenSpaceEventType.RIGHT_UP);
+        }
+
+        async function enable3D() {
+            window.CESIUM_BASE_URL = CESIUM_BASE;
+
+            const css = document.createElement('link');
+            css.rel = 'stylesheet';
+            css.href = CESIUM_BASE + 'Widgets/widgets.css';
+            document.head.appendChild(css);
+
+            try {
+                await new Promise((resolve, reject) => {
+                    const script = document.createElement('script');
+                    script.src = CESIUM_BASE + 'Cesium.js';
+                    script.onload = resolve;
+                    script.onerror = () => reject(new Error('Failed to load CesiumJS from ' + script.src));
+                    document.head.appendChild(script);
+                });
+                initCesium();
+            } catch (error) {
+                showError(error.toString());
+            }
+        }
+
+        if (is3D) {
+            enable3D();
+        }
     </script>
 </body>
 </html>
