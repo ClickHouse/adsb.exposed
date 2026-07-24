@@ -517,6 +517,28 @@
         let cesiumViewer = null;
         let cesiumDensityLayer = null;
 
+        /// ClickHouse always renders a density tile as 1024x1024 pixels, and by default one
+        /// of those pixels covers exactly one CSS pixel. On a high-DPI display that means
+        /// every data pixel is stretched over devicePixelRatio² device pixels, and with
+        /// `image-rendering: pixelated` it becomes a plainly visible square. Giving the tile
+        /// a `tile_scale` times smaller footprint and asking for a tile `tile_zoom_shift`
+        /// levels deeper instead puts one data pixel on one device pixel — at the price of
+        /// tile_scale² times more tiles, queries and bytes.
+        ///
+        /// Only powers of two, because the scale is realized as whole extra zoom levels.
+        /// Auto-detection stops at 2, which is what ordinary retina screens need. It is not
+        /// the end of the story on Apple Vision Pro: there devicePixelRatio stays 2 however
+        /// close you walk up to the window, so the pixels grow with every step. Hence the
+        /// manual ?res= override, which goes up to 4.
+        const res_param = +new URLSearchParams(window.location.search).get('res');
+        const tile_scale = (() => {
+            /// Anything not a positive number (absent, zero, negative, junk) means "decide
+            /// for me"; Math.log2 below would turn it into a NaN tile size otherwise.
+            const scale = res_param > 0 ? res_param : Math.min(2, window.devicePixelRatio || 1);
+            return Math.min(4, Math.max(1, 2 ** Math.round(Math.log2(scale))));
+        })();
+        const tile_zoom_shift = Math.log2(tile_scale);
+
         function showError(text) {
             let err = document.getElementById('error');
             document.getElementById('error-text').textContent = text;
@@ -722,11 +744,14 @@
             providers_elem.style.display = config.endpoints.length > 1 ? 'block' : 'none';
 
             const layer_options = {
-                tileSize: 1024,
+                /// The canvas stays 1024x1024; only the area it covers shrinks — see tile_scale.
+                tileSize: 1024 / tile_scale,
                 minZoom: 2,
                 maxZoom: 19,
                 minNativeZoom: 2,
-                maxNativeZoom: 16,
+                /// The deepest tile ClickHouse is asked for stays the same (z = 14), so the
+                /// data ceiling does not move: the shift is compensated here.
+                maxNativeZoom: 16 - tile_zoom_shift,
                 attribution: `© Alexey Milovidov, ClickHouse, Inc. (data: ${config.notice})`
             };
 
@@ -770,10 +795,19 @@
             updateMap();
         }
 
+        /// The faint outlines under the density layer deserve the same treatment as the
+        /// density tiles themselves: half-size tiles one zoom level deeper, so they are drawn
+        /// at device resolution rather than CSS resolution. (Spelled out instead of using
+        /// Leaflet's `detectRetina`, which additionally decrements maxZoom and would hide the
+        /// layer at the map's deepest zoom.) OSM serves nothing past z = 19, hence the clamp;
+        /// one extra level is all it can give, so tile_scale = 4 gets no more than 2 does.
+        const base_retina = tile_scale > 1;
         let base_layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            zoomOffset: 0,
+            tileSize: base_retina ? 128 : 256,
+            zoomOffset: base_retina ? 1 : 0,
             minZoom: 2,
             maxZoom: 19,
+            maxNativeZoom: base_retina ? 18 : 19,
             attribution: '© OpenStreetMap',
             opacity: 0.1,
         });
@@ -795,6 +829,14 @@
 
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
+
+        /// #map magnifies the tile canvases with `image-rendering: pixelated`, which is what
+        /// keeps them crisp. But when ?res= asks for more data pixels than the display has
+        /// device pixels, that same nearest-neighbour sampling throws the extra pixels away —
+        /// smooth downscaling turns them into antialiasing instead.
+        if (tile_scale > (window.devicePixelRatio || 1)) {
+            map_elem.style.imageRendering = 'auto';
+        }
         let selected_box = [];
         let cached_tiles = {};
         let last_selected_example = null;
@@ -1105,8 +1147,12 @@
         /// Fetch the raw 1024x1024 RGBA buffer for one tile from ClickHouse, using the
         /// shared per-query tile cache. Throws on error; the caller decides how to
         /// surface it. Shared by the 2D (Leaflet) and 3D (Cesium) rendering paths.
-        async function fetchTileBuffer(level, coords, sql) {
-            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
+        ///
+        /// `tile` is in ClickHouse tile coordinates (z = 0 is the single world tile), which
+        /// the two paths arrive at differently: Leaflet counts its own tiles, Cesium's
+        /// tiling scheme happens to already agree. See clickhouseTile() and requestImage().
+        async function fetchTileBuffer(level, tile, sql) {
+            const key = `${sipHash128(sql)}-${tile.z}-${tile.x}-${tile.y}`;
 
             if (!config.disable_cache) {
                 if (!cached_tiles[key]) cached_tiles[key] = [];
@@ -1115,13 +1161,13 @@
             }
 
             ++query_sequence_num;
-            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
+            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${tile.z}-${tile.x}-${tile.y}`;
             const hosts = getHosts(key);
             const url = host => `${host}/?user=website&default_format=RowBinary` +
                 (config.disable_cache ? '&use_query_cache=0' : '') +
                 `&query_id=${query_id}&replace_running_query=1` +
                 `&param_table=${level.table}&param_sampling=${level.sample}` +
-                `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
+                `&param_z=${tile.z}&param_x=${tile.x}&param_y=${tile.y}`;
 
             progress_update_period = 1;
 
@@ -1134,6 +1180,13 @@
             return buf;
         }
 
+        /// A Leaflet tile of `1024 / tile_scale` CSS pixels at map zoom z is the ClickHouse
+        /// tile of 1024 data pixels at z - 2 + tile_zoom_shift: the map is 256 * 2^z CSS
+        /// pixels wide, so the layer holds 2^(z - 2 + tile_zoom_shift) tiles per side.
+        function clickhouseTile(coords) {
+            return { z: coords.z - 2 + tile_zoom_shift, x: coords.x, y: coords.y };
+        }
+
         async function render(level, coords, tile) {
             /// Each render of a given tile element bumps a token; a slower, superseded
             /// request must not overwrite the tile drawn by a newer one.
@@ -1144,7 +1197,7 @@
 
             let buf;
             try {
-                buf = await fetchTileBuffer(level, coords, sql);
+                buf = await fetchTileBuffer(level, clickhouseTile(coords), sql);
             } catch (error) {
                 reportTileError(error);
                 return;
@@ -2432,6 +2485,13 @@
             if (is3D) {
                 search += `&3d=1`;   /// Keep the 3D choice in the link across navigation.
             }
+            if (res_param > 0) {
+                /// Likewise for an explicitly asked-for resolution — this rewrite would
+                /// otherwise drop it, and the next reload would fall back to the detected
+                /// one. An auto-detected scale is deliberately not written out: it is a
+                /// property of the display, not of the view being shared.
+                search += `&res=${tile_scale}`;
+            }
             history.replaceState(state, '', search);
         }
 
@@ -2526,8 +2586,8 @@
         /// A Cesium ImageryProvider backed by the ClickHouse density tiles for one
         /// sampling table. Cesium's WebMercatorTilingScheme uses one 1024px tile at
         /// level 0 and 2^L tiles at level L — exactly the tiling ClickHouse expects via
-        /// param_z/x/y — so a Cesium level maps directly to ClickHouse's param_z (which
-        /// is coords.z - 2, hence z = level + 2 below).
+        /// param_z/x/y — so a Cesium level *is* ClickHouse's param_z. (tile_scale plays no
+        /// part here: in 3D the level comes from the camera height, see cesiumTargetLevel.)
         function makeDensityImageryProvider(samplingLevel) {
             const tilingScheme = new Cesium.WebMercatorTilingScheme();
             /// Freeze the query for this provider instance; cesiumRefresh() creates a
@@ -2567,10 +2627,9 @@
                 getTileCredits: function() { return undefined; },
                 pickFeatures: function() { return undefined; },
                 requestImage: async function(x, y, level, request) {
-                    const coords = { z: level + 2, x: x, y: y };
                     /// Throw on failure so Cesium's retry (errorEvent above) kicks in
                     /// instead of caching a blank tile.
-                    const buf = await fetchTileBuffer(samplingLevel, coords, sql);
+                    const buf = await fetchTileBuffer(samplingLevel, { z: level, x: x, y: y }, sql);
                     hideError();
                     return bufToTileCanvas(buf);
                 }

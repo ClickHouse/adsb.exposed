@@ -242,6 +242,10 @@ const layer_options = {
 
 It uses tiles of 1024x1024 size for high resolution and to lower the number of requests to the database.
 
+A tile is always 1024x1024 *data* pixels, but how much screen it covers depends on the display. By default one data pixel would cover one CSS pixel, which on a high-DPI screen means it is stretched over `devicePixelRatio²` device pixels and (thanks to `image-rendering: pixelated`) shows up as a plainly visible square. To avoid that, the tile is given a `tile_scale` times smaller footprint — `tileSize: 1024 / tile_scale` — and ClickHouse is asked for a tile `log2(tile_scale)` levels deeper, which puts one data pixel on one device pixel. `maxNativeZoom` is lowered by the same amount, so the deepest tile ever requested is still `z = 14` and the level of detail available at maximum zoom does not change.
+
+`tile_scale` is a power of two, detected from `devicePixelRatio` and capped at 2. That cap is not the end of the story on Apple Vision Pro, where `devicePixelRatio` stays 2 no matter how close you walk up to the window, so the pixels grow with every step; `?res=4` overrides the detection there. Note that the resolution is paid for in full: `tile_scale = 2` means four times as many tiles, queries and bytes.
+
 The rendering function performs a request to ClickHouse using its HTTP API with the JavaScript's `fetch` function:
 
 ```
