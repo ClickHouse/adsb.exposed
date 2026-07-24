@@ -1487,11 +1487,15 @@
         /// Restore from a saved link
 
         function latlngToMercator(latlng) {
+            /// Normalize the longitude into [-180, 180): the map wraps around
+            /// horizontally, so scrolling across the antimeridian yields
+            /// out-of-range longitudes that would otherwise break the report query.
+            const lng = ((latlng.lng + 180) % 360 + 360) % 360 - 180;
             return {
-                x: Math.round(0xFFFFFFFF * ((latlng.lng + 180) / 360)),
+                x: Math.round(0xFFFFFFFF * ((lng + 180) / 360)),
                 y: Math.round(0xFFFFFFFF * (1/2 - Math.log(Math.tan((latlng.lat + 90) / 360 * Math.PI)) / 2 / Math.PI)),
                 lat: latlng.lat,
-                lng: latlng.lng
+                lng: lng
             };
         }
 
