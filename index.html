@@ -1669,6 +1669,11 @@
                 }
             }
 
+            /// Monotonically increasing token identifying the most recent hover.
+            /// Async picture lookups compare against it so a late-resolving request
+            /// for a previously hovered item cannot overwrite the current picture.
+            let picture_hover_seq = 0;
+
             let cached_pictures = {};
             async function findPictureCached(name) {
                 if (cached_pictures[name]) return cached_pictures[name];
@@ -1711,7 +1716,10 @@
                             /// Pictures from Wikipedia
                             if (report.wiki_field) {
                                 link.addEventListener('mouseover', e => {
+                                    const seq = ++picture_hover_seq;
                                     findPictureCached(row[report.wiki_field]).then(data => {
+                                        /// Ignore results that arrive after the cursor moved elsewhere.
+                                        if (seq !== picture_hover_seq) return;
                                         if (data) {
                                             let picture = document.getElementById('picture');
                                             picture.style.display = 'block';
@@ -1724,6 +1732,8 @@
                                     });
                                 });
                                 link.addEventListener('mouseout', e => {
+                                    /// Invalidate any in-flight lookup for this item.
+                                    ++picture_hover_seq;
                                     let picture = document.getElementById('picture');
                                     picture.style.display = 'none';
                                     picture.firstChild.src = '';
