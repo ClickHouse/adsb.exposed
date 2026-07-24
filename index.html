@@ -1964,6 +1964,15 @@
                 }
             }
 
+            /// Wikipedia metadata is arbitrary HTML written by anyone, so it cannot be trusted.
+            /// Parse it into an inert document (no scripts, no loaded resources, not attached to
+            /// the page) and keep only the text: sometimes there are tables, paragraphs, etc.
+            function htmlToText(html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                for (const elem of doc.body.querySelectorAll('script, style')) elem.remove();
+                return doc.body.textContent.replace(/\s+/g, ' ').trim();
+            }
+
             async function findPicture(name) {
                 const wiki_api_url = 'https://en.wikipedia.org/w/api.php';
 
@@ -2009,7 +2018,7 @@
                         const image_info_data = await image_info_response.json();
 
                         const metadata = Object.values(image_info_data.query.pages)[0].imageinfo[0].extmetadata;
-                        const attribution = `${metadata.LicenseShortName.value}, ${metadata.Artist.value}`;
+                        const attribution = htmlToText(`${metadata.LicenseShortName.value}, ${metadata.Artist.value}`);
 
                         return {src: pages[page_id].thumbnail.source.replace(/\/\d+px/, '/500px'), attr: attribution};
                     }
@@ -2072,9 +2081,7 @@
                                             picture.style.display = 'block';
                                             picture.firstChild.src = data.src;
                                             let copyright = document.getElementById('picture-copyright');
-                                            copyright.innerHTML = data.attr;
-                                            /// Sometimes there are tables, paragraphs, etc. Strip them.
-                                            copyright.innerHTML = copyright.innerText;
+                                            copyright.textContent = data.attr;
                                         }
                                     });
                                 });
