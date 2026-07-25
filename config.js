@@ -1851,6 +1851,22 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
                 filter_expr: (value => `nav_status = ${value.replaceAll("'", "")}`),
                 content: (row => `${SHIPS_NAV_STATUS[row.nav_status_str] || `code ${row.nav_status_str}`} (${Number(row.c).toLocaleString()})`)
             },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT data_source, count() AS c
+                    FROM {table:Identifier}
+                    WHERE ${condition}
+                    GROUP BY data_source
+                    ORDER BY c DESC
+                    LIMIT 100`),
+                field: 'data_source',
+                id: 'report_datasource',
+                title: 'Source: ',
+                separator: ', ',
+                content: (row => `${row.data_source} (${Number(row.c).toLocaleString()})`)
+            },
         ],
         queries: {
 "Speed": `WITH
@@ -2109,6 +2125,40 @@ SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha):
 FROM {table:Identifier}
 WHERE in_tile
     AND intDiv(mmsi, 1000000) = 111
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+
+"MarineCadastre": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(1000000 DIV {sampling:UInt32} DIV zoom_factor, count()) AS max_total,
+
+    pow(total / max_total, 1/5) AS transparency,
+    greatest(0, least(avg(sog), 30)) / 30 AS color2,
+
+    255 AS alpha,
+    (1 + transparency) / 2 * 0.9 * 255 AS red,
+    transparency * 255 AS green,
+    color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND data_source = 'marinecadastre'
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         }
     },
@@ -2549,6 +2599,1575 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     255 * hot AS red,
     64 * hot AS green,
     255 * (1 - hot) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "GBIF": {
+        notice: "© GBIF.org, occurrence data (CC0 & CC-BY), https://www.gbif.org/",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'gbif_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'gbif_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'gbif_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'eventdate', exclude: "eventdate > '1900-01-01'" },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS occurrences, uniq(species) AS species,
+                    minIf(eventdate, eventdate > '1900-01-01') AS first, max(eventdate) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => {
+                let row = json.data[0];
+                let text = `Total ${Number(row.occurrences).toLocaleString()} occurrences of ${Number(row.species).toLocaleString()} species.`;
+                if (row.occurrences > 0) text += ` Dates: ${row.first} — ${row.last}.`;
+                if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                return text;
+            }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT scientificname, species, count() AS c
+                    FROM {table:Identifier}
+                    WHERE species != '' AND ${condition}
+                    GROUP BY scientificname, species ORDER BY c DESC LIMIT 100`),
+                field: 'species',
+                wiki_field: 'species',
+                id: 'report_species',
+                title: 'Species: ',
+                separator: ', ',
+                content: (row => `${row.species}${row.c > 1 ? `\u00a0(${row.c})` : ''}`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT class, count() AS c FROM {table:Identifier}
+                    WHERE class != '' AND ${condition}
+                    GROUP BY class ORDER BY c DESC LIMIT 50`),
+                field: 'class',
+                id: 'report_classes',
+                title: 'Class: ',
+                separator: ', ',
+                content: (row => `${row.class} (${Number(row.c).toLocaleString()})`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT kingdom, count() AS c FROM {table:Identifier}
+                    WHERE kingdom != '' AND ${condition}
+                    GROUP BY kingdom ORDER BY c DESC LIMIT 20`),
+                field: 'kingdom',
+                id: 'report_kingdoms',
+                title: 'Kingdom: ',
+                separator: ', ',
+                content: (row => `${row.kingdom} (${Number(row.c).toLocaleString()})`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 100 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 10000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha,
+    color3 * 255 AS red,
+    color2 * 255 AS green,
+    color1 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Kingdoms": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(kingdom) AS hash,
+    pow(least(1, total / 1000 * zoom_factor), 1/5) AS transparency,
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Classes": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(class) AS hash,
+    pow(least(1, total / 1000 * zoom_factor), 1/5) AS transparency,
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND class != ''
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Birds": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 300 * zoom_factor), 1/5) AS transparency,
+    255 * (0.25 + 0.75 * transparency) AS alpha,
+    255*transparency AS red, 64 AS green, 255*(1-transparency) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND class = 'Aves'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Mammals": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 100 * zoom_factor), 1/5) AS transparency,
+    255 * (0.25 + 0.75 * transparency) AS alpha,
+    255 AS red, 200*transparency AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND class = 'Mammalia'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Insects": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 300 * zoom_factor), 1/5) AS transparency,
+    255 * (0.25 + 0.75 * transparency) AS alpha,
+    64 AS red, 255*transparency AS green, 255*(1-transparency) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND class = 'Insecta'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Plants": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    255 * (0.25 + 0.75 * transparency) AS alpha,
+    64 AS red, 255*(0.3+0.7*transparency) AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND kingdom = 'Plantae'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Fungi": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS transparency,
+    255 * (0.25 + 0.75 * transparency) AS alpha,
+    255*transparency AS red, 128*transparency AS green, 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND kingdom = 'Fungi'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Time": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 100 * zoom_factor), 1/5) AS transparency,
+    greatest(0, avg(toYear(eventdate) - 1950) / (2025 - 1950)) AS rel,
+    255 * transparency AS alpha,
+    255 * (1 - rel) AS red,
+    255 * rel AS green,
+    64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND eventdate > '1950-01-01'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+
+    "OSM History": {
+        notice: "© OpenStreetMap contributors, ODbL v1.0 (full history)",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'osm_history_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'osm_history_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'osm_history_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'timestamp' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS versions, uniq(uid) AS mappers, min(timestamp) AS first, max(timestamp) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.versions).toLocaleString()} node versions by ${Number(row.mappers).toLocaleString()} mappers.`; if (row.versions>0) text += ` Edited: ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT name, count() AS c FROM {table:Identifier}
+                    WHERE name != '' AND ${condition}
+                    GROUP BY name ORDER BY c DESC LIMIT 100`),
+                field: 'name',
+                id: 'report_name',
+                title: 'Names: ',
+                separator: ', ',
+                content: (row => `${row.name}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT user, count() AS c FROM {table:Identifier}
+                    WHERE user != '' AND ${condition}
+                    GROUP BY user ORDER BY c DESC LIMIT 100`),
+                field: 'user',
+                id: 'report_user',
+                title: 'Mappers: ',
+                separator: ', ',
+                content: (row => `${row.user}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 20000 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 20000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha,
+    color3 * 255 AS red, color2 * 255 AS green, color1 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Freshness": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
+    greatest(0, avg(timestamp::Int64 - '2005-01-01'::DateTime::Int64) / (now()::Int64 - '2005-01-01'::DateTime::Int64)) AS rel,
+    255 * transparency AS alpha,
+    255 * (1 - rel) AS red, 255 * rel AS green, 0 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Mappers": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
+    cityHash64(user) AS hash, hash MOD 256 AS h1, hash DIV 256 MOD 256 AS h2,
+    (0.5 + 0.5 * transparency) * 255 AS alpha,
+    avg(h1) AS red, avg(h2) AS green, avg(least(255, greatest(0, 255 - (h1 + h2) / 2))) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Versions": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
+    least(1, (avg(version) - 1) / 5) AS hot,
+    255 * transparency AS alpha,
+    255 * hot AS red, 64 * hot AS green, 255 * (1 - hot) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Edits per node": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
+    least(1, uniq(id) > 0 ? count() / uniq(id) / 6 : 0) AS churn,
+    255 * transparency AS alpha,
+    255 * churn AS red, 128 * transparency AS green, 255 * (1 - churn) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Buildings": {
+        notice: "© Overture Maps Foundation, https://overturemaps.org/",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'overture_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'overture_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'overture_mercator',           sample: 1,   priority: 3 },
+        ],
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS buildings, uniqIf(name, name != '') AS named
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.buildings).toLocaleString()} buildings, ${Number(row.named).toLocaleString()} named.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT name, count() AS c FROM {table:Identifier}
+                    WHERE name != '' AND ${condition}
+                    GROUP BY name ORDER BY c DESC LIMIT 100`),
+                field: 'name',
+                id: 'report_name',
+                title: 'Names: ',
+                separator: ', ',
+                content: (row => `${row.name}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT class, count() AS c FROM {table:Identifier}
+                    WHERE class != '' AND ${condition}
+                    GROUP BY class ORDER BY c DESC LIMIT 100`),
+                field: 'class',
+                id: 'report_class',
+                title: 'Class: ',
+                separator: ', ',
+                content: (row => `${row.class}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT subtype, count() AS c FROM {table:Identifier}
+                    WHERE subtype != '' AND ${condition}
+                    GROUP BY subtype ORDER BY c DESC LIMIT 100`),
+                field: 'subtype',
+                id: 'report_subtype',
+                title: 'Subtype: ',
+                separator: ', ',
+                content: (row => `${row.subtype}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 50000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 5000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha,
+    color1 * 255 AS red, color2 * 255 AS green, color3 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Height": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    least(1, avgIf(height, height > 0) / 50) AS tall,
+    255 * (0.3 + 0.7 * transparency) AS alpha,
+    255 * tall AS red, 255 * (1 - tall) * transparency AS green, 255 * (1 - tall) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Floors": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    least(1, avgIf(num_floors, num_floors > 0) / 20) AS tall,
+    255 * (0.3 + 0.7 * transparency) AS alpha,
+    255 * tall AS red, 128 * transparency AS green, 255 * (1 - tall) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Roof Shape": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(roof_shape) AS hash,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    (0.3 + 0.7 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red, avg(hash DIV 256 MOD 256) AS green, avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND roof_shape != ''
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Named": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    avg(name != '') AS named,
+    255 * transparency AS alpha,
+    255 * (1 - named) AS red, 255 * named AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Weather": {
+        notice: "NOAA Integrated Surface Database (ISD), public domain",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'isd_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'isd_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'isd_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'timestamp' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS obs, uniq(station) AS stations, round(avgIf(temperature, isNotNull(temperature)),1) AS t, min(timestamp) AS first, max(timestamp) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.obs).toLocaleString()} observations from ${Number(row.stations).toLocaleString()} stations.`; if (row.obs>0) text += ` Avg temp: ${row.t}°C. Time: ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT name, count() AS c FROM {table:Identifier}
+                    WHERE name != '' AND ${condition}
+                    GROUP BY name ORDER BY c DESC LIMIT 100`),
+                field: 'name',
+                id: 'report_name',
+                title: 'Station: ',
+                separator: ', ',
+                content: (row => `${row.name}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+            },
+        ],
+        queries: {
+"Temperature": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(0, least(1, (avgIf(temperature, isNotNull(temperature)) + 30) / 70)) AS t,
+    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
+    255 * (0.4 + 0.6 * transparency) AS alpha,
+    255 * t AS red, 255 * (1 - abs(t - 0.5) * 2) AS green, 255 * (1 - t) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND isNotNull(temperature)
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Wind": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    least(1, avgIf(wind_speed, isNotNull(wind_speed)) / 20) AS w,
+    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
+    255 * (0.4 + 0.6 * transparency) AS alpha,
+    255 * w AS red, 255 * w AS green, 255 * (1 - w) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND isNotNull(wind_speed)
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Pressure": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() AS total,
+    greatest(0, least(1, (avgIf(pressure, isNotNull(pressure)) - 980) / 60)) AS p,
+    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
+    255 * (0.4 + 0.6 * transparency) AS alpha,
+    255 * (1 - p) AS red, 128 AS green, 255 * p AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND isNotNull(pressure)
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Stations": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 5 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 50000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha,
+    color1 * 255 AS red, color2 * 255 AS green, color3 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "iNaturalist": {
+        notice: "© iNaturalist contributors, iNaturalist Open Data, https://inaturalist.org/",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'inat_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'inat_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'inat_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'observed_on', exclude: "observed_on > '2008-01-01'" },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS obs, uniq(name) AS species, uniq(observer_id) AS observers,
+                    minIf(observed_on, observed_on > '2008-01-01') AS first, max(observed_on) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => {
+                let row = json.data[0];
+                let text = `Total ${Number(row.obs).toLocaleString()} observations of ${Number(row.species).toLocaleString()} taxa by ${Number(row.observers).toLocaleString()} observers.`;
+                if (row.obs > 0) text += ` Dates: ${row.first} — ${row.last}.`;
+                if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                return text;
+            }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT name, count() AS c FROM {table:Identifier}
+                    WHERE name != '' AND ${condition}
+                    GROUP BY name ORDER BY c DESC LIMIT 100`),
+                field: 'name',
+                wiki_field: 'name',
+                id: 'report_name',
+                title: 'Taxa: ',
+                separator: ', ',
+                content: (row => `${row.name}${row.c > 1 ? `\u00a0(${row.c})` : ''}`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT rank, count() AS c FROM {table:Identifier}
+                    WHERE rank != '' AND ${condition}
+                    GROUP BY rank ORDER BY c DESC LIMIT 30`),
+                field: 'rank',
+                id: 'report_rank',
+                title: 'Rank: ',
+                separator: ', ',
+                content: (row => `${row.rank} (${Number(row.c).toLocaleString()})`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 100 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 10000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 1000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha, color1 * 255 AS red, color3 * 255 AS green, color2 * 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Species": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(name) AS hash,
+    pow(least(1, total / 1000 * zoom_factor), 1/5) AS transparency,
+    (0.4 + 0.6 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red, avg(hash DIV 256 MOD 256) AS green, avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND name != ''
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Research grade": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 1000 * zoom_factor), 1/5) AS transparency,
+    avg(quality_grade = 'research') AS rg,
+    255 * transparency AS alpha,
+    255 * (1 - rg) AS red, 255 * rg AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Observers": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(observer_id) AS hash,
+    pow(least(1, total / 1000 * zoom_factor), 1/5) AS transparency,
+    (0.4 + 0.6 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red, avg(hash DIV 256 MOD 256) AS green, avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Time": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 100 * zoom_factor), 1/5) AS transparency,
+    greatest(0, avg(toYear(observed_on) - 2008) / (2025 - 2008)) AS rel,
+    255 * transparency AS alpha,
+    255 * (1 - rel) AS red, 255 * rel AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND observed_on > '2008-01-01'
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Taxi": {
+        notice: "NYC TLC trip records (coordinate-bearing archive), public domain",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'taxi_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'taxi_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'taxi_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'pickup_datetime' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS trips, round(avg(trip_distance),2) AS dist, round(avgIf(fare_amount, fare_amount>0),2) AS fare, min(pickup_datetime) AS first, max(pickup_datetime) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.trips).toLocaleString()} trips. Avg ${row.dist} mi, $${row.fare}.`; if (row.trips>0) text += ` ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 50000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 5000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha, 255 * color3 AS red, 255 * color2 AS green, 255 * color1 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Tips": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    least(1, avgIf(tip_amount / fare_amount, fare_amount > 0) / 0.3) AS tip,
+    255 * transparency AS alpha, 255 * (1 - tip) AS red, 255 * tip AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND fare_amount > 0
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Trip distance": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    least(1, avg(trip_distance) / 10) AS d,
+    255 * transparency AS alpha, 255 * d AS red, 128 * transparency AS green, 255 * (1 - d) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND trip_distance > 0
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Fare": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    least(1, avgIf(fare_amount, fare_amount > 0) / 60) AS f,
+    255 * transparency AS alpha, 255 * f AS red, 255 * (1 - f) AS green, 64 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND fare_amount > 0
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Night rides": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
+    avg(toHour(pickup_datetime) < 6 OR toHour(pickup_datetime) >= 22) AS night,
+    255 * transparency AS alpha, 255 * night AS red, 64 AS green, 255 * (1 - night) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Fires": {
+        notice: "NASA FIRMS (VIIRS S-NPP active fire), attribution required",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'firms_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'firms_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'firms_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'acq_date' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS fires, round(avg(frp),1) AS frp, min(acq_date) AS first, max(acq_date) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.fires).toLocaleString()} fire detections, avg FRP ${row.frp} MW.`; if (row.fires>0) text += ` ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT country, count() AS c FROM {table:Identifier}
+                    WHERE country != '' AND ${condition}
+                    GROUP BY country ORDER BY c DESC LIMIT 100`),
+                field: 'country',
+                id: 'report_country',
+                title: 'Country: ',
+                separator: ', ',
+                content: (row => `${row.country} (${Number(row.c).toLocaleString()})`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 3000 * zoom_factor), 1/5) AS t,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 AS red, 200 * t AS green, 0 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Intensity": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 3000 * zoom_factor), 1/5) AS t,
+    least(1, avg(frp) / 100) AS frp,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 AS red, 255 * (1 - frp) AS green, 0 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Day / Night": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 3000 * zoom_factor), 1/5) AS t,
+    avg(daynight = 'N') AS night,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 * (1 - night) AS red, 128 * t AS green, 255 * night AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Time": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 3000 * zoom_factor), 1/5) AS t,
+    avg(toDayOfYear(acq_date)) / 366 AS doy,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 * doy AS red, 255 * (1 - doy) AS green, 128 * t AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Lightning": {
+        notice: "NOAA GOES-16 GLM lightning, public domain",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'glm_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'glm_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'glm_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'timestamp' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS flashes, min(timestamp) AS first, max(timestamp) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.flashes).toLocaleString()} lightning flashes.`; if (row.flashes>0) text += ` ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    255 * (0.2 + 0.8 * t) AS alpha, 200 * t AS red, 200 * t AS green, 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Energy": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    least(1, avg(energy) / 2e-14) AS e,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 * e AS red, 255 * e AS green, 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Flash area": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    least(1, avg(area) / 3e8) AS a,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 * a AS red, 128 AS green, 255 * (1 - a) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Time": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    avg(toHour(timestamp)) / 24 AS h,
+    255 * (0.2 + 0.8 * t) AS alpha, 255 * h AS red, 128 AS green, 255 * (1 - h) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Population": {
+        notice: "Kontur Population 2023 (H3), CC BY 4.0",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'population_mercator', sample: 1, priority: 1 },
+        ],
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT round(sum(population)) AS pop, count() AS cells
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total population ${Number(row.pop).toLocaleString()} in ${Number(row.cells).toLocaleString()} cells.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    sum(population) AS total,
+    pow(least(1, total / 5000 * zoom_factor), 1/5) AS color1,
+    pow(least(1, total / 500000 * zoom_factor), 1/5) AS color2,
+    pow(least(1, total / 50000000 * zoom_factor), 1/5) AS color3,
+    255 AS alpha, 255 * color3 AS red, 255 * color2 AS green, 255 * color1 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Log density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    sum(population) AS total,
+    least(1, log10(1 + total) / 7) AS l,
+    255 AS alpha, 255 * l AS red, 255 * (1 - abs(l - 0.5) * 2) AS green, 255 * (1 - l) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+        }
+    },
+
+    "Transit": {
+        notice: "Live GTFS-Realtime vehicle positions © transit agencies",
+        endpoints: [
+            {
+                name: "Cloud (Real-Time)",
+                urls: [
+                    {
+                        url: "https://kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                        sticky: "https://{hash}.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com",
+                    }
+                ]
+            },
+        ],
+        levels: [
+            { table: 'gtfs_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'gtfs_mercator_sample10',  sample: 10,  priority: 2 },
+            { table: 'gtfs_mercator',           sample: 1,   priority: 3 },
+        ],
+        time: { column: 'timestamp' },
+        report_total: {
+            query: (condition => `
+                WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                SELECT count() AS positions, uniq(vehicle_id) AS vehicles, uniq(feed) AS feeds, min(timestamp) AS first, max(timestamp) AS last
+                FROM {table:Identifier} WHERE ${condition}`),
+            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.positions).toLocaleString()} positions from ${Number(row.vehicles).toLocaleString()} vehicles (${row.feeds} feeds).`; if (row.positions>0) text += ` ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+        },
+        reports: [
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT feed, count() AS c FROM {table:Identifier}
+                    WHERE feed != '' AND ${condition}
+                    GROUP BY feed ORDER BY c DESC LIMIT 100`),
+                field: 'feed',
+                id: 'report_feed',
+                title: 'Feed: ',
+                separator: ', ',
+                content: (row => `${row.feed} (${Number(row.c).toLocaleString()})`)
+            },
+            {
+                query: (condition => `
+                    WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
+                        AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
+                    SELECT route_id, count() AS c FROM {table:Identifier}
+                    WHERE route_id != '' AND ${condition}
+                    GROUP BY route_id ORDER BY c DESC LIMIT 100`),
+                field: 'route_id',
+                id: 'report_route_id',
+                title: 'Route: ',
+                separator: ', ',
+                content: (row => `${row.route_id} (${Number(row.c).toLocaleString()})`)
+            },
+        ],
+        queries: {
+"Density": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    255 * (0.3 + 0.7 * t) AS alpha, 64 AS red, 255 * t AS green, 255 AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Routes": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    cityHash64(route_id) AS hash,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    255 * (0.3 + 0.7 * t) AS alpha,
+    avg(hash MOD 256) AS red, avg(hash DIV 256 MOD 256) AS green, avg(hash DIV 65536 MOD 256) AS blue
+
+SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
+FROM {table:Identifier}
+WHERE in_tile AND route_id != ''
+GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+"Speed": `WITH
+    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin,
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
+    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
+    y * 1024 + x AS pos,
+
+    count() * {sampling:UInt32} AS total,
+    pow(least(1, total / 50 * zoom_factor), 1/5) AS t,
+    least(1, avg(speed) / 30) AS s,
+    255 * (0.3 + 0.7 * t) AS alpha, 255 * s AS red, 255 * (1 - s) AS green, 64 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
