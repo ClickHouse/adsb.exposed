@@ -22,6 +22,10 @@
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
+
+            /* Width of the report panel's draggable left border. Read from JavaScript to
+               decide whether a pointer press landed on the grip. */
+            --report-grip-width: 8px;
         }
         * {
             box-sizing: border-box;
@@ -359,6 +363,25 @@
             display: none;
             max-height: 100%;
             overflow-y: scroll;
+            /* The left border doubles as the grip for resizing the panel. Being a border of
+               the panel itself, it stays glued to the panel's edge for free — a separately
+               positioned handle would have to be kept aligned as the width changes, and,
+               inside this scroll container, would scroll away with the content. */
+            border-left: var(--report-grip-width) solid #333;
+            /* Vertical panning still scrolls the panel; horizontal drags are ours. */
+            touch-action: pan-y;
+        }
+
+        #report.grip {
+            border-left-color: #666;
+            cursor: col-resize;
+        }
+
+        /* While dragging, the pointer keeps the resize cursor wherever it travels, and
+           text under it must not get selected. */
+        body.report-resizing, body.report-resizing #report {
+            cursor: col-resize;
+            user-select: none;
         }
 
         #report div {
@@ -854,6 +877,115 @@
 
         /// Protect from race conditions.
         let report_sequence_num = 0;
+
+        /// Resizing the report panel by dragging its left border.
+        ///
+        /// The panel is the second column of the body grid, so its width is the width of that
+        /// track. The dragged width is written as an inline `grid-template-columns` on the
+        /// body — setting the property directly, rather than interpolating a custom property
+        /// into it, which is what issue #3 was about. With no width chosen, the inline style
+        /// is absent and the stylesheet's `fit-content(20%)` default applies.
+
+        const report_grip_width = parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--report-grip-width'));
+        /// Enough of the panel to stay readable, and enough of the map to stay usable.
+        const report_min_width = 100;
+        const map_min_width = 200;
+
+        let report_width = null;    /// null: no explicit width, use the stylesheet default.
+        let report_resize = null;
+        let report_resize_frame = null;
+
+        function reportMaxWidth() {
+            return Math.max(report_min_width, window.innerWidth - map_min_width);
+        }
+
+        function applyReportWidth() {
+            document.body.style.gridTemplateColumns =
+                report_width === null ? '' : `auto ${report_width}px`;
+        }
+
+        /// Leaflet caches the map's size, so it has to re-measure while the map column grows
+        /// and shrinks, otherwise the newly exposed strip stays blank. Throttled to one call
+        /// per frame, because a pointermove can fire several times per frame.
+        function reportResizeRedrawMap() {
+            if (report_resize_frame !== null) return;
+            report_resize_frame = requestAnimationFrame(() => {
+                report_resize_frame = null;
+                map.invalidateSize({pan: false});
+            });
+        }
+
+        /// Whether a pointer position falls on the grip, i.e. within the panel's left border.
+        function onReportGrip(e) {
+            const offset = e.clientX - reports_elem.getBoundingClientRect().left;
+            return offset >= 0 && offset < report_grip_width;
+        }
+
+        reports_elem.addEventListener('pointerdown', e => {
+            if (e.button !== 0 || !onReportGrip(e)) return;
+
+            report_resize = {
+                pointer_id: e.pointerId,
+                start_x: e.clientX,
+                /// The panel may still be at its default width, so measure it rather than
+                /// assuming `report_width` is set.
+                start_width: reports_elem.getBoundingClientRect().width,
+            };
+            /// Keep receiving moves after the pointer leaves the (narrow, and moving) border.
+            reports_elem.setPointerCapture(e.pointerId);
+            document.body.classList.add('report-resizing');
+            e.preventDefault();
+        });
+
+        reports_elem.addEventListener('pointermove', e => {
+            if (!report_resize) {
+                reports_elem.classList.toggle('grip', onReportGrip(e));
+                return;
+            }
+            if (e.pointerId !== report_resize.pointer_id) return;
+
+            /// Dragging the left border leftwards widens the panel.
+            const width = report_resize.start_width + report_resize.start_x - e.clientX;
+            report_width = Math.min(reportMaxWidth(), Math.max(report_min_width, width));
+            applyReportWidth();
+            reportResizeRedrawMap();
+            e.preventDefault();
+        });
+
+        function reportResizeStop(e) {
+            if (!report_resize || e.pointerId !== report_resize.pointer_id) return;
+            const pointer_id = report_resize.pointer_id;
+            /// Cleared first: releasing the capture fires `lostpointercapture`, which lands
+            /// back here and must not release a capture that is already gone.
+            report_resize = null;
+            document.body.classList.remove('report-resizing');
+            if (reports_elem.hasPointerCapture(pointer_id)) {
+                reports_elem.releasePointerCapture(pointer_id);
+            }
+            map.invalidateSize();
+        }
+
+        reports_elem.addEventListener('pointerup', reportResizeStop);
+        reports_elem.addEventListener('pointercancel', reportResizeStop);
+        reports_elem.addEventListener('lostpointercapture', reportResizeStop);
+
+        /// Double-clicking the grip goes back to the automatic width.
+        reports_elem.addEventListener('dblclick', e => {
+            if (!onReportGrip(e)) return;
+            report_width = null;
+            applyReportWidth();
+            reportResizeRedrawMap();
+        });
+
+        /// A width picked in a wide window can leave no room for the map in a narrow one.
+        window.addEventListener('resize', () => {
+            if (report_width === null) return;
+            const clamped = Math.min(reportMaxWidth(), Math.max(report_min_width, report_width));
+            if (clamped === report_width) return;
+            report_width = clamped;
+            applyReportWidth();
+        });
 
         /// Query editor
 
@@ -1918,6 +2050,8 @@
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
             document.body.classList.add('report-open');
+            /// A width the user dragged earlier survives closing and reopening the panel.
+            applyReportWidth();
 
             const current_query = query_elem.value;
 
@@ -2179,6 +2313,9 @@
             selected_box = [];
             document.getElementById('report').style.display = 'none';
             document.body.classList.remove('report-open');
+            /// The column must really collapse: a leftover explicit track width would keep an
+            /// empty gap on the right even with the panel itself hidden.
+            document.body.style.gridTemplateColumns = '';
             let picture = document.getElementById('picture');
             picture.style.display = 'none';
             picture.firstChild.src = '';
