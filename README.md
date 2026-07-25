@@ -216,7 +216,7 @@ Beyond ADS-B, the site now hosts a family of large open geospatial datasets, eac
 | Dataset | Rows | Source | Pipeline |
 |---|---|---|---|
 | **OSM** (current nodes) | 10.7 B | [osm-pds](https://registry.opendata.aws/osm/) planet ORC | [osm-setup.sql](osm-setup.sql) · [prepare-osm.sh](prepare-osm.sh) |
-| **OSM History** (all node versions) | ~20 B | osm-pds full-history ORC | [osm-history-setup.sql](osm-history-setup.sql) · [prepare-osm-history.sh](prepare-osm-history.sh) |
+| **OSM History** (all node versions) | 9.5 B | osm-pds full-history ORC | [osm-history-setup.sql](osm-history-setup.sql) · [prepare-osm-history.sh](prepare-osm-history.sh) |
 | **GBIF** (species occurrences) | 2.85 B | [GBIF on AWS](https://registry.opendata.aws/gbif/) Parquet (CC0 + CC-BY) | [gbif-setup.sql](gbif-setup.sql) · [prepare-gbif.sh](prepare-gbif.sh) |
 | **iNaturalist** (observations) | 257 M | [iNaturalist Open Data](https://registry.opendata.aws/inaturalist-open-data/) | [inat-setup.sql](inat-setup.sql) · [prepare-inat.sh](prepare-inat.sh) |
 | **Buildings** (Overture) | 2.55 B | [Overture Maps](https://docs.overturemaps.org/) Parquet (bbox centroids) | [overture-setup.sql](overture-setup.sql) · [prepare-overture.sh](prepare-overture.sh) |

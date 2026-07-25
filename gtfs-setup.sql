@@ -22,12 +22,4 @@ CREATE TABLE gtfs_mercator
     speed Float32
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE gtfs_mercator_sample10 AS gtfs_mercator;
-CREATE TABLE gtfs_mercator_sample100 AS gtfs_mercator;
-
-CREATE MATERIALIZED VIEW gtfs_view_sample10 TO gtfs_mercator_sample10 AS SELECT * FROM gtfs_mercator WHERE rand() % 10 = 0;
-CREATE MATERIALIZED VIEW gtfs_view_sample100 TO gtfs_mercator_sample100 AS SELECT * FROM gtfs_mercator WHERE rand() % 100 = 0;
-
 GRANT SELECT ON default.gtfs_mercator TO website;
-GRANT SELECT ON default.gtfs_mercator_sample10 TO website;
-GRANT SELECT ON default.gtfs_mercator_sample100 TO website;
