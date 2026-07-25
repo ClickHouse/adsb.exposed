@@ -2625,7 +2625,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             { table: 'gbif_mercator_sample10',  sample: 10,  priority: 2 },
             { table: 'gbif_mercator',           sample: 1,   priority: 3 },
         ],
-        time: { column: 'eventdate', exclude: "eventdate > '1900-01-01'" },
+        time: { column: 'eventdate', exclude: "eventdate > '1970-01-01' AND eventdate <= today()" },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -2665,6 +2665,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     WHERE class != '' AND ${condition}
                     GROUP BY class ORDER BY c DESC LIMIT 50`),
                 field: 'class',
+                wiki_field: 'class',
                 id: 'report_classes',
                 title: 'Class: ',
                 separator: ', ',
@@ -2678,6 +2679,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     WHERE kingdom != '' AND ${condition}
                     GROUP BY kingdom ORDER BY c DESC LIMIT 20`),
                 field: 'kingdom',
+                wiki_field: 'kingdom',
                 id: 'report_kingdoms',
                 title: 'Kingdom: ',
                 separator: ', ',
@@ -2894,7 +2896,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
-WHERE in_tile AND eventdate > '1950-01-01'
+WHERE in_tile AND eventdate > '1950-01-01' AND eventdate <= today()
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         }
     },
