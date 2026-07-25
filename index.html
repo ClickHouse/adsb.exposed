@@ -23,7 +23,9 @@
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
 
-            --report-width: 0%;
+            /* Width of the report panel's draggable left border. Read from JavaScript to
+               decide whether a pointer press landed on the grip. */
+            --report-grip-width: 8px;
         }
         * {
             box-sizing: border-box;
@@ -40,9 +42,20 @@
 
         body {
             display: grid;
-            grid-template-columns: auto var(--report-width);
+            grid-template-columns: auto 0%;
             grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) fit-content(2.6em) 1em auto;
             grid-gap: 0;
+        }
+
+        /* The report panel lives in the second grid column, which stays collapsed to zero
+           width while there is no report. The two states are switched with a class rather
+           than by rewriting a `--report-width` variable interpolated into
+           `grid-template-columns`, because in Firefox the column sometimes kept its old
+           width and the panel would not go away (issue #3). A plain class toggle changes
+           the declared value of the property itself, which does not depend on Firefox
+           invalidating the grid layout when only a custom property changes. */
+        body.report-open {
+            grid-template-columns: auto fit-content(20%);
         }
 
         #proud {
@@ -277,6 +290,70 @@
             float: right;
         }
 
+        /* GitHub star counter, floated to the right of the 3D toggle. It is an <a>, and its
+           counter a <b>, not spans, so that neither the dataset-selection loops nor the
+           `.choices span` box styling of the row treat them as dataset choices. */
+        #github-stars {
+            float: right;
+            display: inline-block;
+            padding: .25em .5em;
+            background: #444;
+            border: solid 0.125em black;
+            color: white;
+            text-decoration: none;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        #github-stars:hover {
+            color: black;
+            background: yellow;
+        }
+
+        #github-stars svg {
+            width: 1em;
+            height: 1em;
+            fill: currentColor;
+            vertical-align: -0.125em;
+        }
+
+        #github-stars b {
+            font-weight: bold;
+        }
+
+        /* The active filter: the conditions added to the example's own WHERE clause, either by
+           clicking a report item or by hand. It is highlighted in yellow, because it silently
+           affects everything on the map, and it is not a span, so that neither the example
+           selection loops nor the `.choices span` box styling treat it as an example. */
+        #active-filter {
+            display: none;
+            float: right;
+            padding: .25em .5em;
+            background: yellow;
+            border: solid 0.125em black;
+            color: black;
+            white-space: nowrap;
+            user-select: none;
+        }
+
+        #active-filter-text {
+            display: inline-block;
+            max-width: 30em;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            vertical-align: bottom;
+            font-weight: bold;
+        }
+
+        #active-filter-clear {
+            padding-left: .5em;
+            cursor: pointer;
+        }
+
+        #active-filter-clear:hover {
+            color: #c00;
+        }
+
         #report {
             color: white;
             font-size: 12pt;
@@ -286,6 +363,25 @@
             display: none;
             max-height: 100%;
             overflow-y: scroll;
+            /* The left border doubles as the grip for resizing the panel. Being a border of
+               the panel itself, it stays glued to the panel's edge for free — a separately
+               positioned handle would have to be kept aligned as the width changes, and,
+               inside this scroll container, would scroll away with the content. */
+            border-left: var(--report-grip-width) solid #333;
+            /* Vertical panning still scrolls the panel; horizontal drags are ours. */
+            touch-action: pan-y;
+        }
+
+        #report.grip {
+            border-left-color: #666;
+            cursor: col-resize;
+        }
+
+        /* While dragging, the pointer keeps the resize cursor wherever it travels, and
+           text under it must not get selected. */
+        body.report-resizing, body.report-resizing #report {
+            cursor: col-resize;
+            user-select: none;
         }
 
         #report div {
@@ -419,7 +515,7 @@
     <a id="proud" href="https://github.com/ClickHouse/ClickHouse">Proudly made with <b>ClickHouse</b> open-source database</a>
     <div id="datasets" class="choices"></div>
     <textarea spellcheck="false" data-gramm="false" id="query"></textarea>
-    <div id="examples" class="choices"></div>
+    <div id="examples" class="choices"><div id="active-filter">Filter: <b id="active-filter-text"></b><b id="active-filter-clear" title="Clear the filter">&times;</b></div></div>
     <div id="timeslider">
         <span id="timeslider-title">Time: <span id="timeslider-label"></span></span>
         <span id="timeslider-reset">Reset</span>
@@ -452,6 +548,34 @@
         const is3D = new URLSearchParams(window.location.search).get('3d') == '1';
         let cesiumViewer = null;
         let cesiumDensityLayer = null;
+        /// The selection rectangle drawn on the globe (a Cesium.Rectangle, or null for none).
+        /// Declared up here, and not down in the Cesium block with the rest of its state,
+        /// because showReport()/hideReport() keep it in step with `selected_box` and both can
+        /// run while the page is still loading — long before that block is reached.
+        let cesiumSelectionRectangle = null;
+
+        /// ClickHouse always renders a density tile as 1024x1024 pixels, and one of those
+        /// pixels covers exactly one CSS pixel. On a high-DPI display that means every data
+        /// pixel is stretched over devicePixelRatio² device pixels, and with
+        /// `image-rendering: pixelated` it becomes a plainly visible square. Giving the tile
+        /// a `tile_scale` times smaller footprint and asking for a tile `tile_zoom_shift`
+        /// levels deeper instead puts one data pixel on one device pixel.
+        ///
+        /// Opt-in through ?res=, because the resolution is paid for in full: tile_scale² times
+        /// more tiles, queries and bytes, and a whole new set of server-side query cache keys.
+        /// ?res=2 is what an ordinary retina screen can show. ?res=4 goes beyond any display's
+        /// own ratio and is really supersampling — see the image-rendering note further down;
+        /// on Apple Vision Pro, where devicePixelRatio stays 2 however close you walk up to
+        /// the window, that smoothness is the only thing left to gain.
+        const tile_scale = (() => {
+            const requested = +new URLSearchParams(window.location.search).get('res');
+            /// Anything not a positive number (absent, zero, negative, junk) means the plain
+            /// CSS-resolution default; Math.log2 would turn it into a NaN tile size otherwise.
+            if (!(requested > 0)) return 1;
+            /// Only powers of two, because the scale is realized as whole extra zoom levels.
+            return Math.min(4, Math.max(1, 2 ** Math.round(Math.log2(requested))));
+        })();
+        const tile_zoom_shift = Math.log2(tile_scale);
 
         function showError(text) {
             let err = document.getElementById('error');
@@ -467,6 +591,8 @@
 
         let datasets_elem = document.getElementById('datasets');
         let examples_elem = document.getElementById('examples');
+        let active_filter_elem = document.getElementById('active-filter');
+        let active_filter_text_elem = document.getElementById('active-filter-text');
         let reports_elem = document.getElementById('report');
         let providers_elem = document.getElementById('provider');
 
@@ -485,6 +611,45 @@
             });
             datasets_elem.append(span);
         });
+
+        /// GitHub star counter. Appended before the 3D toggle so that, both being floated
+        /// right, it ends up on the rightmost side of the datasets row. The count is fetched
+        /// from the GitHub API and cached in localStorage, so normal navigation doesn't hit
+        /// the (rate-limited) API on every page load.
+        let github_stars = document.createElement('a');
+        github_stars.id = 'github-stars';
+        github_stars.href = 'https://github.com/ClickHouse/adsb.exposed/';
+        github_stars.target = '_blank';
+        github_stars.rel = 'noopener noreferrer';
+        github_stars.title = 'Star adsb.exposed on GitHub';
+        github_stars.innerHTML = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.751.751 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/></svg> Star <b id="github-stars-count"></b>`;
+        datasets_elem.append(github_stars);
+
+        (function() {
+            const repo = 'ClickHouse/adsb.exposed';
+            const cache_key = 'github-stars-' + repo;
+            const ttl = 6 * 3600 * 1000;
+            const count_elem = document.getElementById('github-stars-count');
+
+            try {
+                let cached = JSON.parse(localStorage.getItem(cache_key) || 'null');
+                if (cached && Date.now() - cached.t < ttl) {
+                    count_elem.textContent = cached.n;
+                    return;
+                }
+            } catch (e) {}
+
+            fetch(`https://api.github.com/repos/${repo}`)
+                .then(response => response.ok ? response.json() : null)
+                .then(data => {
+                    if (!data || typeof data.stargazers_count != 'number') return;
+                    count_elem.textContent = data.stargazers_count;
+                    try {
+                        localStorage.setItem(cache_key, JSON.stringify({ n: data.stargazers_count, t: Date.now() }));
+                    } catch (e) {}
+                })
+                .catch(() => {});
+        })();
 
         /// 3D globe toggle, on the right of the datasets row. Switching modes flips the
         /// ?3d URL parameter and reloads, so the choice is remembered in the link and the
@@ -525,6 +690,8 @@
             }
 
             examples_elem.append('Examples: ');
+            /// The row was just cleared; put the (floated) filter slab back into it.
+            examples_elem.append(active_filter_elem);
             Object.keys(queries).forEach((example, idx) => {
                 let span = document.createElement('span');
                 if (!idx) {
@@ -615,11 +782,14 @@
             providers_elem.style.display = config.endpoints.length > 1 ? 'block' : 'none';
 
             const layer_options = {
-                tileSize: 1024,
+                /// The canvas stays 1024x1024; only the area it covers shrinks — see tile_scale.
+                tileSize: 1024 / tile_scale,
                 minZoom: 2,
                 maxZoom: 19,
                 minNativeZoom: 2,
-                maxNativeZoom: 16,
+                /// The deepest tile ClickHouse is asked for stays the same (z = 14), so the
+                /// data ceiling does not move: the shift is compensated here.
+                maxNativeZoom: 16 - tile_zoom_shift,
                 attribution: `© Alexey Milovidov, ClickHouse, Inc. (data: ${config.notice})`
             };
 
@@ -663,10 +833,20 @@
             updateMap();
         }
 
+        /// The faint outlines under the density layer deserve the same treatment as the
+        /// density tiles themselves: half-size tiles one zoom level deeper, so they are drawn
+        /// at device resolution rather than CSS resolution. (Spelled out instead of using
+        /// Leaflet's `detectRetina`, which additionally decrements maxZoom and would hide the
+        /// layer at the map's deepest zoom.) OSM serves nothing past z = 19, hence the clamp;
+        /// one extra level is all it can give, so tile_scale = 4 gets no more than 2 does.
+        /// Following ?res= also means the free OSM tile server sees no extra load by default.
+        const base_retina = tile_scale > 1;
         let base_layer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            zoomOffset: 0,
+            tileSize: base_retina ? 128 : 256,
+            zoomOffset: base_retina ? 1 : 0,
             minZoom: 2,
             maxZoom: 19,
+            maxNativeZoom: base_retina ? 18 : 19,
             attribution: '© OpenStreetMap',
             opacity: 0.1,
         });
@@ -688,12 +868,129 @@
 
         let query_elem = document.getElementById('query');
         let map_elem = document.getElementById('map');
+
+        /// #map magnifies the tile canvases with `image-rendering: pixelated`, which is what
+        /// keeps them crisp. But when ?res= asks for more data pixels than the display has
+        /// device pixels, that same nearest-neighbour sampling throws the extra pixels away —
+        /// smooth downscaling turns them into antialiasing instead.
+        if (tile_scale > (window.devicePixelRatio || 1)) {
+            map_elem.style.imageRendering = 'auto';
+        }
         let selected_box = [];
         let cached_tiles = {};
         let last_selected_example = null;
 
         /// Protect from race conditions.
         let report_sequence_num = 0;
+
+        /// Resizing the report panel by dragging its left border.
+        ///
+        /// The panel is the second column of the body grid, so its width is the width of that
+        /// track. The dragged width is written as an inline `grid-template-columns` on the
+        /// body — setting the property directly, rather than interpolating a custom property
+        /// into it, which is what issue #3 was about. With no width chosen, the inline style
+        /// is absent and the stylesheet's `fit-content(20%)` default applies.
+
+        const report_grip_width = parseFloat(
+            getComputedStyle(document.documentElement).getPropertyValue('--report-grip-width'));
+        /// Enough of the panel to stay readable, and enough of the map to stay usable.
+        const report_min_width = 100;
+        const map_min_width = 200;
+
+        let report_width = null;    /// null: no explicit width, use the stylesheet default.
+        let report_resize = null;
+        let report_resize_frame = null;
+
+        function reportMaxWidth() {
+            return Math.max(report_min_width, window.innerWidth - map_min_width);
+        }
+
+        function applyReportWidth() {
+            document.body.style.gridTemplateColumns =
+                report_width === null ? '' : `auto ${report_width}px`;
+        }
+
+        /// Leaflet caches the map's size, so it has to re-measure while the map column grows
+        /// and shrinks, otherwise the newly exposed strip stays blank. Throttled to one call
+        /// per frame, because a pointermove can fire several times per frame.
+        function reportResizeRedrawMap() {
+            if (report_resize_frame !== null) return;
+            report_resize_frame = requestAnimationFrame(() => {
+                report_resize_frame = null;
+                map.invalidateSize({pan: false});
+            });
+        }
+
+        /// Whether a pointer position falls on the grip, i.e. within the panel's left border.
+        function onReportGrip(e) {
+            const offset = e.clientX - reports_elem.getBoundingClientRect().left;
+            return offset >= 0 && offset < report_grip_width;
+        }
+
+        reports_elem.addEventListener('pointerdown', e => {
+            if (e.button !== 0 || !onReportGrip(e)) return;
+
+            report_resize = {
+                pointer_id: e.pointerId,
+                start_x: e.clientX,
+                /// The panel may still be at its default width, so measure it rather than
+                /// assuming `report_width` is set.
+                start_width: reports_elem.getBoundingClientRect().width,
+            };
+            /// Keep receiving moves after the pointer leaves the (narrow, and moving) border.
+            reports_elem.setPointerCapture(e.pointerId);
+            document.body.classList.add('report-resizing');
+            e.preventDefault();
+        });
+
+        reports_elem.addEventListener('pointermove', e => {
+            if (!report_resize) {
+                reports_elem.classList.toggle('grip', onReportGrip(e));
+                return;
+            }
+            if (e.pointerId !== report_resize.pointer_id) return;
+
+            /// Dragging the left border leftwards widens the panel.
+            const width = report_resize.start_width + report_resize.start_x - e.clientX;
+            report_width = Math.min(reportMaxWidth(), Math.max(report_min_width, width));
+            applyReportWidth();
+            reportResizeRedrawMap();
+            e.preventDefault();
+        });
+
+        function reportResizeStop(e) {
+            if (!report_resize || e.pointerId !== report_resize.pointer_id) return;
+            const pointer_id = report_resize.pointer_id;
+            /// Cleared first: releasing the capture fires `lostpointercapture`, which lands
+            /// back here and must not release a capture that is already gone.
+            report_resize = null;
+            document.body.classList.remove('report-resizing');
+            if (reports_elem.hasPointerCapture(pointer_id)) {
+                reports_elem.releasePointerCapture(pointer_id);
+            }
+            map.invalidateSize();
+        }
+
+        reports_elem.addEventListener('pointerup', reportResizeStop);
+        reports_elem.addEventListener('pointercancel', reportResizeStop);
+        reports_elem.addEventListener('lostpointercapture', reportResizeStop);
+
+        /// Double-clicking the grip goes back to the automatic width.
+        reports_elem.addEventListener('dblclick', e => {
+            if (!onReportGrip(e)) return;
+            report_width = null;
+            applyReportWidth();
+            reportResizeRedrawMap();
+        });
+
+        /// A width picked in a wide window can leave no room for the map in a narrow one.
+        window.addEventListener('resize', () => {
+            if (report_width === null) return;
+            const clamped = Math.min(reportMaxWidth(), Math.max(report_min_width, report_width));
+            if (clamped === report_width) return;
+            report_width = clamped;
+            applyReportWidth();
+        });
 
         /// Query editor
 
@@ -712,6 +1009,7 @@
                 selected_example.classList.remove('selected');
             }
 
+            updateActiveFilter();
             updateTimeSlider();
 
             if (is3D) {
@@ -757,6 +1055,65 @@
             if (!patch) return query;
             return query.replace(/(WHERE\s+.+?)\s*(GROUP\s+BY)/is, '$1 ' + patch + '\n$2');
         }
+
+        /// The conditions narrowing the example's own WHERE clause: either added by clicking
+        /// an item in the report (which marks them with a `/* Filter: */` comment), or typed
+        /// by hand. The marker is checked first, because it survives sharing a link, while
+        /// hand-written conditions can only be recognized by diffing with the example.
+        const filter_marker_re = /\/\*\s*Filter:\s*\*\/\s*AND\s+([\s\S]+?)\s*(?=GROUP\s+BY)/i;
+
+        function getActiveFilter() {
+            const marked = filter_marker_re.exec(query_elem.value);
+            if (marked) return marked[1];
+
+            if (last_selected_example && queries[last_selected_example]) {
+                const patch = getWherePatch(query_elem.value, queries[last_selected_example]);
+                if (patch) return patch.replace(/^AND\s+/i, '');
+            }
+
+            return null;
+        }
+
+        /// Show the active filter as a slab in the examples row, or hide the slab if the query
+        /// only has the example's own filters.
+        function updateActiveFilter() {
+            const filter = getActiveFilter();
+            if (filter === null) {
+                active_filter_elem.style.display = 'none';
+                return;
+            }
+            const text = filter.replace(/\s+/g, ' ');
+            active_filter_text_elem.textContent = text;
+            active_filter_elem.title = text;
+            active_filter_elem.style.display = 'inline-block';
+        }
+
+        /// Drop the active filter, keeping the rest of the query (including the user's edits
+        /// outside of the WHERE clause) as is.
+        function clearFilter() {
+            let query = query_elem.value.replace(filter_marker_re, '');
+
+            /// Hand-written conditions have no marker: restore the example's WHERE clause.
+            if (last_selected_example && queries[last_selected_example]) {
+                const original_where = extractWhereClause(queries[last_selected_example]);
+                if (original_where && getWherePatch(query, queries[last_selected_example])) {
+                    query = query.replace(/WHERE[\s\S]+?(GROUP\s+BY)/i,
+                        (match, group_by) => `WHERE ${original_where}\n${group_by}`);
+                }
+            }
+
+            setQuery(query);
+
+            /// The filter may have been the only difference from the example: highlight it again.
+            for (const example of examples_elem.querySelectorAll('span')) {
+                if (queries[example.textContent] === query) {
+                    example.classList.add('selected');
+                    last_selected_example = example.textContent;
+                }
+            }
+        }
+
+        document.getElementById('active-filter-clear').addEventListener('click', clearFilter);
 
         function setQuery(value) {
             query_elem.value = value;
@@ -938,8 +1295,12 @@
         /// Fetch the raw 1024x1024 RGBA buffer for one tile from ClickHouse, using the
         /// shared per-query tile cache. Throws on error; the caller decides how to
         /// surface it. Shared by the 2D (Leaflet) and 3D (Cesium) rendering paths.
-        async function fetchTileBuffer(level, coords, sql) {
-            const key = `${sipHash128(sql)}-${coords.z}-${coords.x}-${coords.y}`;
+        ///
+        /// `tile` is in ClickHouse tile coordinates (z = 0 is the single world tile), which
+        /// the two paths arrive at differently: Leaflet counts its own tiles, Cesium's
+        /// tiling scheme happens to already agree. See clickhouseTile() and requestImage().
+        async function fetchTileBuffer(level, tile, sql) {
+            const key = `${sipHash128(sql)}-${tile.z}-${tile.x}-${tile.y}`;
 
             if (!config.disable_cache) {
                 if (!cached_tiles[key]) cached_tiles[key] = [];
@@ -948,13 +1309,13 @@
             }
 
             ++query_sequence_num;
-            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${coords.z - 2}-${coords.x}-${coords.y}`;
+            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${tile.z}-${tile.x}-${tile.y}`;
             const hosts = getHosts(key);
             const url = host => `${host}/?user=website&default_format=RowBinary` +
                 (config.disable_cache ? '&use_query_cache=0' : '') +
                 `&query_id=${query_id}&replace_running_query=1` +
                 `&param_table=${level.table}&param_sampling=${level.sample}` +
-                `&param_z=${coords.z - 2}&param_x=${coords.x}&param_y=${coords.y}`;
+                `&param_z=${tile.z}&param_x=${tile.x}&param_y=${tile.y}`;
 
             progress_update_period = 1;
 
@@ -967,6 +1328,13 @@
             return buf;
         }
 
+        /// A Leaflet tile of `1024 / tile_scale` CSS pixels at map zoom z is the ClickHouse
+        /// tile of 1024 data pixels at z - 2 + tile_zoom_shift: the map is 256 * 2^z CSS
+        /// pixels wide, so the layer holds 2^(z - 2 + tile_zoom_shift) tiles per side.
+        function clickhouseTile(coords) {
+            return { z: coords.z - 2 + tile_zoom_shift, x: coords.x, y: coords.y };
+        }
+
         async function render(level, coords, tile) {
             /// Each render of a given tile element bumps a token; a slower, superseded
             /// request must not overwrite the tile drawn by a newer one.
@@ -977,7 +1345,7 @@
 
             let buf;
             try {
-                buf = await fetchTileBuffer(level, coords, sql);
+                buf = await fetchTileBuffer(level, clickhouseTile(coords), sql);
             } catch (error) {
                 reportTileError(error);
                 return;
@@ -1686,7 +2054,11 @@
 
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
-            document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
+            document.body.classList.add('report-open');
+            /// A width the user dragged earlier survives closing and reopening the panel.
+            applyReportWidth();
+            /// Keep the globe's rectangle on the area this report is about.
+            cesiumUpdateSelection();
 
             const current_query = query_elem.value;
 
@@ -1797,6 +2169,15 @@
                 }
             }
 
+            /// Wikipedia metadata is arbitrary HTML written by anyone, so it cannot be trusted.
+            /// Parse it into an inert document (no scripts, no loaded resources, not attached to
+            /// the page) and keep only the text: sometimes there are tables, paragraphs, etc.
+            function htmlToText(html) {
+                const doc = new DOMParser().parseFromString(html, 'text/html');
+                for (const elem of doc.body.querySelectorAll('script, style')) elem.remove();
+                return doc.body.textContent.replace(/\s+/g, ' ').trim();
+            }
+
             async function findPicture(name) {
                 const wiki_api_url = 'https://en.wikipedia.org/w/api.php';
 
@@ -1842,7 +2223,7 @@
                         const image_info_data = await image_info_response.json();
 
                         const metadata = Object.values(image_info_data.query.pages)[0].imageinfo[0].extmetadata;
-                        const attribution = `${metadata.LicenseShortName.value}, ${metadata.Artist.value}`;
+                        const attribution = htmlToText(`${metadata.LicenseShortName.value}, ${metadata.Artist.value}`);
 
                         return {src: pages[page_id].thumbnail.source.replace(/\/\d+px/, '/500px'), attr: attribution};
                     }
@@ -1905,9 +2286,7 @@
                                             picture.style.display = 'block';
                                             picture.firstChild.src = data.src;
                                             let copyright = document.getElementById('picture-copyright');
-                                            copyright.innerHTML = data.attr;
-                                            /// Sometimes there are tables, paragraphs, etc. Strip them.
-                                            copyright.innerHTML = copyright.innerText;
+                                            copyright.textContent = data.attr;
                                         }
                                     });
                                 });
@@ -1939,8 +2318,13 @@
 
         function hideReport() {
             selected_box = [];
+            /// The selection is gone, so take its rectangle off the globe too.
+            cesiumUpdateSelection();
             document.getElementById('report').style.display = 'none';
-            document.documentElement.style.setProperty('--report-width', '0%');
+            document.body.classList.remove('report-open');
+            /// The column must really collapse: a leftover explicit track width would keep an
+            /// empty gap on the right even with the panel itself hidden.
+            document.body.style.gridTemplateColumns = '';
             let picture = document.getElementById('picture');
             picture.style.display = 'none';
             picture.firstChild.src = '';
@@ -1959,7 +2343,8 @@
 
         function selectStart(e) {
             /// Box selection reads Leaflet coordinates, which are meaningless while the
-            /// Cesium globe is shown. Disabled in 3D until selection is wired to Cesium.
+            /// Cesium globe is shown. In 3D the globe has its own right-drag selection, which
+            /// picks the corners off the sphere instead (see setupCesiumSelection).
             if (is3D) return;
             if (e.button !== 2 && !select_toggle_active) return;
 
@@ -2258,6 +2643,11 @@
             if (is3D) {
                 search += `&3d=1`;   /// Keep the 3D choice in the link across navigation.
             }
+            if (tile_scale > 1) {
+                /// Likewise for the resolution — this rewrite would otherwise drop it, and
+                /// panning the map would silently undo the setting.
+                search += `&res=${tile_scale}`;
+            }
             history.replaceState(state, '', search);
         }
 
@@ -2289,7 +2679,11 @@
                 initial_load = false;
             }
 
-            if (selected_box && selected_box.length == 2) {
+            /// The globe draws its own rectangle (see cesiumUpdateSelection). This flat one is
+            /// placed with Leaflet's projection, which has nothing to do with what the camera
+            /// is looking at, and it sits above the Cesium canvas — so in 3D it would show up
+            /// as a second, misplaced selection floating over the globe.
+            if (!is3D && selected_box && selected_box.length == 2) {
                 const point0 = map.latLngToContainerPoint([selected_box[0].lat, selected_box[0].lng]);
                 const point1 = map.latLngToContainerPoint([selected_box[1].lat, selected_box[1].lng]);
 
@@ -2352,8 +2746,8 @@
         /// A Cesium ImageryProvider backed by the ClickHouse density tiles for one
         /// sampling table. Cesium's WebMercatorTilingScheme uses one 1024px tile at
         /// level 0 and 2^L tiles at level L — exactly the tiling ClickHouse expects via
-        /// param_z/x/y — so a Cesium level maps directly to ClickHouse's param_z (which
-        /// is coords.z - 2, hence z = level + 2 below).
+        /// param_z/x/y — so a Cesium level *is* ClickHouse's param_z. (tile_scale plays no
+        /// part here: in 3D the level comes from the camera height, see cesiumTargetLevel.)
         function makeDensityImageryProvider(samplingLevel) {
             const tilingScheme = new Cesium.WebMercatorTilingScheme();
             /// Freeze the query for this provider instance; cesiumRefresh() creates a
@@ -2393,10 +2787,9 @@
                 getTileCredits: function() { return undefined; },
                 pickFeatures: function() { return undefined; },
                 requestImage: async function(x, y, level, request) {
-                    const coords = { z: level + 2, x: x, y: y };
                     /// Throw on failure so Cesium's retry (errorEvent above) kicks in
                     /// instead of caching a blank tile.
-                    const buf = await fetchTileBuffer(samplingLevel, coords, sql);
+                    const buf = await fetchTileBuffer(samplingLevel, { z: level, x: x, y: y }, sql);
                     hideError();
                     return bufToTileCanvas(buf);
                 }
@@ -2665,6 +3058,33 @@
             setupCesiumSelection(scene);
         }
 
+        /// Draw `selected_box` on the globe, or nothing when there is no selection.
+        ///
+        /// setupCesiumSelection's drag handlers set the rectangle themselves, to follow the
+        /// pointer while a drag is still in progress. This is for the selections that arrive
+        /// without a drag: the `box` URL parameter of a link opened directly in 3D, switching
+        /// to 3D with a report already open (which reloads the page with `box` in the link),
+        /// history navigation, and closing the report. showReport()/hideReport() call it, so
+        /// the globe follows the selection whichever way it was made.
+        function cesiumUpdateSelection() {
+            /// Cesium loads asynchronously and may not be up yet; setupCesiumSelection calls
+            /// this once it is, which is what makes a selection from the link show up.
+            if (!cesiumViewer) return;
+
+            if (selected_box.length != 2) {
+                cesiumSelectionRectangle = null;
+                return;
+            }
+
+            /// A selection box is bounded by constant longitude/latitude lines, so the corners
+            /// are enough to place it on the sphere.
+            cesiumSelectionRectangle = Cesium.Rectangle.fromDegrees(
+                Math.min(selected_box[0].lng, selected_box[1].lng),
+                Math.min(selected_box[0].lat, selected_box[1].lat),
+                Math.max(selected_box[0].lng, selected_box[1].lng),
+                Math.max(selected_box[0].lat, selected_box[1].lat));
+        }
+
         /// Right-drag a rectangle on the globe to select a region and open its report,
         /// mirroring the 2D box selection. Corner coordinates come from picking the
         /// globe surface; right-drag is free because we removed it from the camera's
@@ -2675,7 +3095,6 @@
             const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
             let startCarto = null;     /// Cartographic where the drag began, or null.
             let startPx = null;        /// Canvas pixel where the drag began.
-            let rectangle = null;      /// Current Cesium.Rectangle (radians), or null.
 
             /// Suppress the browser context menu so right-drag selection is usable.
             scene.canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -2684,7 +3103,7 @@
             /// the drag without rebuilding the geometry.
             cesiumViewer.entities.add({
                 rectangle: {
-                    coordinates: new Cesium.CallbackProperty(() => rectangle, false),
+                    coordinates: new Cesium.CallbackProperty(() => cesiumSelectionRectangle, false),
                     material: Cesium.Color.WHITE.withAlpha(0.2),
                     outline: true,
                     outlineColor: Cesium.Color.WHITE,
@@ -2692,13 +3111,17 @@
                 },
             });
 
+            /// A selection may already be waiting — from the link, or from the reload that
+            /// switching to 3D does — and it has nothing to do with a drag.
+            cesiumUpdateSelection();
+
             function pickCarto(px) {
                 const cartesian = scene.camera.pickEllipsoid(px, scene.globe.ellipsoid);
                 return cartesian ? Cesium.Cartographic.fromCartesian(cartesian) : null;
             }
 
             function setRectangle(a, b) {
-                rectangle = new Cesium.Rectangle(
+                cesiumSelectionRectangle = new Cesium.Rectangle(
                     Math.min(a.longitude, b.longitude), Math.min(a.latitude, b.latitude),
                     Math.max(a.longitude, b.longitude), Math.max(a.latitude, b.latitude));
             }
@@ -2728,10 +3151,9 @@
                 startCarto = null;
 
                 /// A right-click (no meaningful drag) closes the report instead of
-                /// selecting a degenerate region.
+                /// selecting a degenerate region. hideSelection() clears `selected_box`,
+                /// and the rectangle follows it off the globe.
                 if (Cesium.Cartesian2.distance(downPx, e.position) < 5) {
-                    rectangle = null;
-                    selected_box = [];
                     hideSelection();
                     return;
                 }

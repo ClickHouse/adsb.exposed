@@ -285,6 +285,10 @@ const layer_options = {
 
 It uses tiles of 1024x1024 size for high resolution and to lower the number of requests to the database.
 
+A tile is always 1024x1024 *data* pixels, and by default one data pixel covers one CSS pixel. On a high-DPI screen that means it is stretched over `devicePixelRatio²` device pixels and — thanks to `image-rendering: pixelated` — shows up as a plainly visible square. The `?res=` parameter trades bandwidth for that: the tile is given a `tile_scale` times smaller footprint (`tileSize: 1024 / tile_scale`) and ClickHouse is asked for a tile `log2(tile_scale)` levels deeper, which puts one data pixel on one device pixel. `maxNativeZoom` is lowered by the same amount, so the deepest tile ever requested is still `z = 14` and the level of detail available at maximum zoom does not change.
+
+`tile_scale` is a power of two up to 4, and it is opt-in because the resolution is paid for in full: `?res=2` means four times as many tiles, queries and bytes, plus a fresh set of server-side query cache keys. `?res=2` is what an ordinary retina screen can show. `?res=4` exceeds any display's own pixel ratio and is really supersampling — the surplus data pixels are downscaled smoothly instead of by nearest neighbour, so they turn into antialiasing. On Apple Vision Pro, where `devicePixelRatio` stays 2 no matter how close you walk up to the window, that smoothness is the only thing left to gain.
+
 The rendering function performs a request to ClickHouse using its HTTP API with the JavaScript's `fetch` function:
 
 ```
@@ -495,9 +499,11 @@ const sql_types = `
     LIMIT 100`;
 ```
 
-The report is calculated for flight numbers, aircraft types, registration (tail numbers), and owners. You can click on any item and it will apply a filter to the main SQL query. For example, click on `A388` and it will show you a visualization for Airbus 380-800.
+The report is calculated for flight numbers, aircraft types, registration (tail numbers), and owners. You can click on any item and it will apply a filter to the main SQL query. For example, click on `A388` and it will show you a visualization for Airbus 380-800. While a filter is applied, it is displayed as a yellow slab on the right of the examples row, with a cross button to remove it — otherwise it is easy to forget that everything on the map is narrowed down by it.
 
 As a bonus, if you move the cursor over an aircraft type, it will go to Wikipedia API and try to find a picture of this aircraft. It often finds something else on Wikipedia, though.
+
+The panel takes 20% of the window by default, which is not always the right amount — long lists of owners want more room, and a map you are looking at closely wants less. You can drag its left border to resize it, and double-click the border to go back to the automatic width. The panel is the second column of the page's CSS grid, so resizing it is a matter of setting that column's width; the map is told to re-measure while you drag, because Leaflet caches the size of its container.
 
 ### Saved Queries
 
