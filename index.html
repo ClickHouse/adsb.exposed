@@ -286,8 +286,14 @@
             color: #000;
         }
 
+        /* The right-hand buttons of the datasets row are floated, and come first in the DOM,
+           so that the dataset buttons flow around them instead of being pushed below them
+           when the row spills onto several lines. The 3D toggle is the leftmost of them, and
+           its left margin is what separates the whole group from the dataset buttons; the two
+           sit flush against each other, as the dataset buttons do. */
         #toggle-3d {
             float: right;
+            margin: 0 0 .25em .5em;
         }
 
         /* GitHub star counter, floated to the right of the 3D toggle. It is an <a>, and its
@@ -295,6 +301,7 @@
            `.choices span` box styling of the row treat them as dataset choices. */
         #github-stars {
             float: right;
+            margin: 0 0 .25em 0;
             display: inline-block;
             padding: .25em .5em;
             background: #444;
@@ -596,26 +603,14 @@
         let reports_elem = document.getElementById('report');
         let providers_elem = document.getElementById('provider');
 
-        datasets_elem.append('Datasets: ');
-        Object.keys(datasets).forEach((dataset_name, idx) => {
-            let span = document.createElement('span');
-            if (!idx) { span.className = 'selected'; }
-            span.append(document.createTextNode(dataset_name));
-            span.addEventListener('click', e => {
-                for (other of document.querySelectorAll('#datasets span')) {
-                    if (other.id === 'toggle-3d') continue;   /// Not a dataset choice.
-                    other.classList.remove('selected');
-                }
-                e.target.classList.add('selected');
-                switchDataset(dataset_name);
-            });
-            datasets_elem.append(span);
-        });
+        /// The right-hand buttons (stars, 3D) are added before the dataset buttons, because a
+        /// float is placed on the line it appears in: added last, they would sink to the last
+        /// line of a wrapped row instead of staying in its top right corner. Of two elements
+        /// floated right, the earlier one ends up rightmost, so the stars come first.
 
-        /// GitHub star counter. Appended before the 3D toggle so that, both being floated
-        /// right, it ends up on the rightmost side of the datasets row. The count is fetched
-        /// from the GitHub API and cached in localStorage, so normal navigation doesn't hit
-        /// the (rate-limited) API on every page load.
+        /// GitHub star counter. The count is fetched from the GitHub API and cached in
+        /// localStorage, so normal navigation doesn't hit the (rate-limited) API on every
+        /// page load.
         let github_stars = document.createElement('a');
         github_stars.id = 'github-stars';
         github_stars.href = 'https://github.com/ClickHouse/adsb.exposed/';
@@ -664,6 +659,22 @@
             window.location.search = params.toString();
         });
         datasets_elem.append(toggle_3d);
+
+        datasets_elem.append('Datasets: ');
+        Object.keys(datasets).forEach((dataset_name, idx) => {
+            let span = document.createElement('span');
+            if (!idx) { span.className = 'selected'; }
+            span.append(document.createTextNode(dataset_name));
+            span.addEventListener('click', e => {
+                for (other of document.querySelectorAll('#datasets span')) {
+                    if (other.id === 'toggle-3d') continue;   /// Not a dataset choice.
+                    other.classList.remove('selected');
+                }
+                e.target.classList.add('selected');
+                switchDataset(dataset_name);
+            });
+            datasets_elem.append(span);
+        });
 
         function clearContainer(elem) {
             while (elem.firstChild) elem.removeChild(elem.firstChild);
