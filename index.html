@@ -548,6 +548,11 @@
         const is3D = new URLSearchParams(window.location.search).get('3d') == '1';
         let cesiumViewer = null;
         let cesiumDensityLayer = null;
+        /// The selection rectangle drawn on the globe (a Cesium.Rectangle, or null for none).
+        /// Declared up here, and not down in the Cesium block with the rest of its state,
+        /// because showReport()/hideReport() keep it in step with `selected_box` and both can
+        /// run while the page is still loading — long before that block is reached.
+        let cesiumSelectionRectangle = null;
 
         /// ClickHouse always renders a density tile as 1024x1024 pixels, and one of those
         /// pixels covers exactly one CSS pixel. On a high-DPI display that means every data
@@ -2052,6 +2057,8 @@
             document.body.classList.add('report-open');
             /// A width the user dragged earlier survives closing and reopening the panel.
             applyReportWidth();
+            /// Keep the globe's rectangle on the area this report is about.
+            cesiumUpdateSelection();
 
             const current_query = query_elem.value;
 
@@ -2311,6 +2318,8 @@
 
         function hideReport() {
             selected_box = [];
+            /// The selection is gone, so take its rectangle off the globe too.
+            cesiumUpdateSelection();
             document.getElementById('report').style.display = 'none';
             document.body.classList.remove('report-open');
             /// The column must really collapse: a leftover explicit track width would keep an
@@ -2334,7 +2343,8 @@
 
         function selectStart(e) {
             /// Box selection reads Leaflet coordinates, which are meaningless while the
-            /// Cesium globe is shown. Disabled in 3D until selection is wired to Cesium.
+            /// Cesium globe is shown. In 3D the globe has its own right-drag selection, which
+            /// picks the corners off the sphere instead (see setupCesiumSelection).
             if (is3D) return;
             if (e.button !== 2 && !select_toggle_active) return;
 
@@ -2669,7 +2679,11 @@
                 initial_load = false;
             }
 
-            if (selected_box && selected_box.length == 2) {
+            /// The globe draws its own rectangle (see cesiumUpdateSelection). This flat one is
+            /// placed with Leaflet's projection, which has nothing to do with what the camera
+            /// is looking at, and it sits above the Cesium canvas — so in 3D it would show up
+            /// as a second, misplaced selection floating over the globe.
+            if (!is3D && selected_box && selected_box.length == 2) {
                 const point0 = map.latLngToContainerPoint([selected_box[0].lat, selected_box[0].lng]);
                 const point1 = map.latLngToContainerPoint([selected_box[1].lat, selected_box[1].lng]);
 
@@ -3044,6 +3058,33 @@
             setupCesiumSelection(scene);
         }
 
+        /// Draw `selected_box` on the globe, or nothing when there is no selection.
+        ///
+        /// setupCesiumSelection's drag handlers set the rectangle themselves, to follow the
+        /// pointer while a drag is still in progress. This is for the selections that arrive
+        /// without a drag: the `box` URL parameter of a link opened directly in 3D, switching
+        /// to 3D with a report already open (which reloads the page with `box` in the link),
+        /// history navigation, and closing the report. showReport()/hideReport() call it, so
+        /// the globe follows the selection whichever way it was made.
+        function cesiumUpdateSelection() {
+            /// Cesium loads asynchronously and may not be up yet; setupCesiumSelection calls
+            /// this once it is, which is what makes a selection from the link show up.
+            if (!cesiumViewer) return;
+
+            if (selected_box.length != 2) {
+                cesiumSelectionRectangle = null;
+                return;
+            }
+
+            /// A selection box is bounded by constant longitude/latitude lines, so the corners
+            /// are enough to place it on the sphere.
+            cesiumSelectionRectangle = Cesium.Rectangle.fromDegrees(
+                Math.min(selected_box[0].lng, selected_box[1].lng),
+                Math.min(selected_box[0].lat, selected_box[1].lat),
+                Math.max(selected_box[0].lng, selected_box[1].lng),
+                Math.max(selected_box[0].lat, selected_box[1].lat));
+        }
+
         /// Right-drag a rectangle on the globe to select a region and open its report,
         /// mirroring the 2D box selection. Corner coordinates come from picking the
         /// globe surface; right-drag is free because we removed it from the camera's
@@ -3054,7 +3095,6 @@
             const handler = new Cesium.ScreenSpaceEventHandler(scene.canvas);
             let startCarto = null;     /// Cartographic where the drag began, or null.
             let startPx = null;        /// Canvas pixel where the drag began.
-            let rectangle = null;      /// Current Cesium.Rectangle (radians), or null.
 
             /// Suppress the browser context menu so right-drag selection is usable.
             scene.canvas.addEventListener('contextmenu', e => e.preventDefault());
@@ -3063,7 +3103,7 @@
             /// the drag without rebuilding the geometry.
             cesiumViewer.entities.add({
                 rectangle: {
-                    coordinates: new Cesium.CallbackProperty(() => rectangle, false),
+                    coordinates: new Cesium.CallbackProperty(() => cesiumSelectionRectangle, false),
                     material: Cesium.Color.WHITE.withAlpha(0.2),
                     outline: true,
                     outlineColor: Cesium.Color.WHITE,
@@ -3071,13 +3111,17 @@
                 },
             });
 
+            /// A selection may already be waiting — from the link, or from the reload that
+            /// switching to 3D does — and it has nothing to do with a drag.
+            cesiumUpdateSelection();
+
             function pickCarto(px) {
                 const cartesian = scene.camera.pickEllipsoid(px, scene.globe.ellipsoid);
                 return cartesian ? Cesium.Cartographic.fromCartesian(cartesian) : null;
             }
 
             function setRectangle(a, b) {
-                rectangle = new Cesium.Rectangle(
+                cesiumSelectionRectangle = new Cesium.Rectangle(
                     Math.min(a.longitude, b.longitude), Math.min(a.latitude, b.latitude),
                     Math.max(a.longitude, b.longitude), Math.max(a.latitude, b.latitude));
             }
@@ -3107,10 +3151,9 @@
                 startCarto = null;
 
                 /// A right-click (no meaningful drag) closes the report instead of
-                /// selecting a degenerate region.
+                /// selecting a degenerate region. hideSelection() clears `selected_box`,
+                /// and the rectangle follows it off the globe.
                 if (Cesium.Cartesian2.distance(downPx, e.position) < 5) {
-                    rectangle = null;
-                    selected_box = [];
                     hideSelection();
                     return;
                 }
