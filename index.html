@@ -1604,8 +1604,11 @@
 
             const query_id = `${uuid}-timeslider-${seq}`;
             const hosts = getHosts('timeslider');
+            /// The histogram covers the whole time range including today, so a long-lived cache
+            /// entry would keep showing yesterday's picture for the most recent days. Cap the
+            /// lifetime of these entries at one hour; the query is cheap enough to redo.
             const url = host => `${host}/?user=website&default_format=JSON` +
-                (config.disable_cache ? '&use_query_cache=0' : '') +
+                (config.disable_cache ? '&use_query_cache=0' : '&query_cache_ttl=3600') +
                 `&query_id=${query_id}&replace_running_query=1&param_table=${table}${geoParams}`;
 
             progress_update_period = 1;
