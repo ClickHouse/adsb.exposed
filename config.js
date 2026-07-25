@@ -3659,7 +3659,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    pow(least(1, total / greatest(1, 60000000 DIV zoom_factor)), 1/5) AS conf,
     least(1, greatest(0, avgIf(tip_amount / fare_amount, fare_amount > 0) / 0.3)) AS m,
 
     255 * conf AS alpha,
@@ -3685,7 +3685,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    pow(least(1, total / greatest(1, 60000000 DIV zoom_factor)), 1/5) AS conf,
     least(1, avg(trip_distance) / 10) AS m,
 
     255 * conf AS alpha,
@@ -3711,7 +3711,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    pow(least(1, total / greatest(1, 60000000 DIV zoom_factor)), 1/5) AS conf,
     least(1, avgIf(fare_amount, fare_amount > 0) / 60) AS m,
 
     255 * conf AS alpha,
@@ -3737,7 +3737,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    pow(least(1, total / greatest(1, 60000000 DIV zoom_factor)), 1/5) AS conf,
     avg(toHour(pickup_datetime) < 6 OR toHour(pickup_datetime) >= 22) AS m,
 
     255 * conf AS alpha,
