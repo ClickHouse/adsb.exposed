@@ -23,9 +23,27 @@ CREATE TABLE isd_mercator
     pressure Nullable(Float32)       -- hPa (sea level)
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE isd_mercator_sample10 AS isd_mercator;
+-- Per-station climatology: one row per station with its mean temperature/wind/pressure.
+-- This tiny table (tens of thousands of rows) is what the Weather map interpolates from —
+-- the tile query gathers a sparse spatial sample of stations and fills every pixel by a
+-- Gaussian-kernel weighted average (see config.js). Populated from isd_mercator.
+CREATE TABLE isd_stations
+(
+    mercator_x UInt32 MATERIALIZED 0xFFFFFFFF * ((lon + 180) / 360),
+    mercator_y UInt32 MATERIALIZED 0xFFFFFFFF * (1/2 - log(tan((lat + 90) / 360 * pi())) / 2 / pi()),
 
-CREATE MATERIALIZED VIEW isd_view_sample10 TO isd_mercator_sample10 AS SELECT * FROM isd_mercator WHERE rand() % 10 = 0;
+    INDEX idx_x (mercator_x) TYPE minmax,
+    INDEX idx_y (mercator_y) TYPE minmax,
+
+    station String,
+    lat Float64,
+    lon Float64,
+    name String,
+    temperature Float32,   -- mean °C
+    wind_speed Float32,    -- mean m/s
+    pressure Float32,      -- mean hPa
+    obs UInt64
+) ENGINE = MergeTree ORDER BY mortonEncode(mercator_x, mercator_y);
 
 GRANT SELECT ON default.isd_mercator TO website;
-GRANT SELECT ON default.isd_mercator_sample10 TO website;
+GRANT SELECT ON default.isd_stations TO website;

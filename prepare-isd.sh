@@ -42,3 +42,22 @@ SETTINGS
     min_insert_block_size_rows = 4194304,
     min_insert_block_size_bytes = 536870912
 " || exit 1
+
+# Build the per-station climatology the Weather map interpolates from.
+clickhouse-client --host "${CLICKHOUSE_PLANES_HOST}" --secure \
+    --user "${CLICKHOUSE_PLANES_USER}" --password "${CLICKHOUSE_PLANES_PASSWORD}" \
+    --query "
+TRUNCATE TABLE isd_stations;
+INSERT INTO isd_stations (station, lat, lon, name, temperature, wind_speed, pressure, obs)
+SELECT station, lat, lon, name, t, ifNull(w, 0), ifNull(p, 0), obs
+FROM (
+    SELECT station, avg(lat) AS lat, avg(lon) AS lon, any(name) AS name,
+        avgIf(temperature, isNotNull(temperature)) AS t,
+        avgIf(wind_speed, isNotNull(wind_speed)) AS w,
+        avgIf(pressure, isNotNull(pressure)) AS p,
+        count() AS obs
+    FROM isd_mercator GROUP BY station
+)
+WHERE isNotNull(t) AND abs(lat) > 0.01 AND abs(lon) > 0.01
+SETTINGS max_threads = 48
+" || exit 1

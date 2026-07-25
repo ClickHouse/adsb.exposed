@@ -3290,31 +3290,36 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'isd_mercator_sample10', sample: 10, priority: 1 },
-            { table: 'isd_mercator', sample: 1, priority: 2 },
+            { table: 'isd_stations', sample: 1, priority: 1 },
         ],
-        time: { column: 'timestamp' },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT count() AS obs, uniq(station) AS stations, round(avgIf(temperature, isNotNull(temperature)),1) AS t, min(timestamp) AS first, max(timestamp) AS last
+                SELECT count() AS stations, round(avg(temperature), 1) AS t
                 FROM {table:Identifier} WHERE ${condition}`),
-            content: (json => { let row = json.data[0]; let text = `Total ${Number(row.obs).toLocaleString()} observations from ${Number(row.stations).toLocaleString()} stations.`; if (row.obs>0) text += ` Avg temp: ${row.t}°C. Time: ${row.first} — ${row.last}.`; if (json.statistics.rows_read>1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`; return text; }),
+            content: (json => {
+                let row = json.data[0];
+                let text = `${Number(row.stations).toLocaleString()} weather stations.`;
+                if (row.stations > 0) text += ` Mean temperature: ${row.t}°C.`;
+                if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
+                return text;
+            }),
         },
         reports: [
             {
                 query: (condition => `
                     WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                         AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT name, count() AS c FROM {table:Identifier}
+                    SELECT name, round(temperature, 1) AS t, obs
+                    FROM {table:Identifier}
                     WHERE name != '' AND ${condition}
-                    GROUP BY name ORDER BY c DESC LIMIT 100`),
+                    ORDER BY obs DESC LIMIT 100`),
                 field: 'name',
-                id: 'report_name',
-                title: 'Station: ',
+                id: 'report_stations',
+                title: 'Stations: ',
                 separator: ', ',
-                content: (row => `${row.name}${row.c > 1 ? ` (${Number(row.c).toLocaleString()})` : ''}`)
+                content: (row => `${row.name} (${row.t}°C)`)
             },
         ],
         queries: {
@@ -3322,95 +3327,140 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-    y * 1024 + x AS pos,
+    tile_size / 1024.0 AS px_scale,
 
-    count() AS total,
-    greatest(0, least(1, (avgIf(temperature, isNotNull(temperature)) + 30) / 70)) AS t,
-    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
-    255 * (0.4 + 0.6 * transparency) AS alpha,
-    255 * t AS red, 255 * (1 - abs(t - 0.5) * 2) AS green, 255 * (1 - t) AS blue
+    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
+    (
+        SELECT groupArray((sx, sy, val))
+        FROM (
+            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
+                   (mercator_y - tile_y_begin) / px_scale AS sy,
+                   temperature AS val
+            FROM {table:Identifier}
+            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
+              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size
+            ORDER BY cityHash64(station) LIMIT 250
+        )
+    ) AS stations,
 
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile AND isNotNull(temperature)
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
+    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
+
+    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
+    arrayMap(c -> (
+        ((c % 128) * 8 + 4)::Float64 AS cx,
+        ((c DIV 128) * 8 + 4)::Float64 AS cy,
+        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
+          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
+         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
+    ).3, range(128 * 128)) AS grid
+
+SELECT
+    round(255 * m)::UInt8 AS red,
+    round(255 * (1 - abs(m - 0.5) * 2))::UInt8 AS green,
+    round(255 * (1 - m))::UInt8 AS blue,
+    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+FROM (
+    SELECT
+        (number % 1024) AS x, (number DIV 1024) AS y,
+        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
+        cell.1 AS val, cell.2 AS d,
+        greatest(0, least(1, (val + 30) / 70)) AS m
+    FROM numbers(1024 * 1024)
+)`,
 "Wind": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-    y * 1024 + x AS pos,
+    tile_size / 1024.0 AS px_scale,
 
-    count() AS total,
-    least(1, avgIf(wind_speed, isNotNull(wind_speed)) / 20) AS w,
-    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
-    255 * (0.4 + 0.6 * transparency) AS alpha,
-    255 * w AS red, 255 * w AS green, 255 * (1 - w) AS blue
+    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
+    (
+        SELECT groupArray((sx, sy, val))
+        FROM (
+            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
+                   (mercator_y - tile_y_begin) / px_scale AS sy,
+                   wind_speed AS val
+            FROM {table:Identifier}
+            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
+              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size AND wind_speed > 0
+            ORDER BY cityHash64(station) LIMIT 250
+        )
+    ) AS stations,
 
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile AND isNotNull(wind_speed)
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
+    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
+    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
+
+    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
+    arrayMap(c -> (
+        ((c % 128) * 8 + 4)::Float64 AS cx,
+        ((c DIV 128) * 8 + 4)::Float64 AS cy,
+        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
+          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
+         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
+    ).3, range(128 * 128)) AS grid
+
+SELECT
+    round(255 * m)::UInt8 AS red,
+    round(120 * (1 - m))::UInt8 AS green,
+    round(255 * (1 - m))::UInt8 AS blue,
+    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+FROM (
+    SELECT
+        (number % 1024) AS x, (number DIV 1024) AS y,
+        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
+        cell.1 AS val, cell.2 AS d,
+        least(1, val / 15) AS m
+    FROM numbers(1024 * 1024)
+)`,
 "Pressure": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-    y * 1024 + x AS pos,
+    tile_size / 1024.0 AS px_scale,
 
-    count() AS total,
-    greatest(0, least(1, (avgIf(pressure, isNotNull(pressure)) - 980) / 60)) AS p,
-    pow(least(1, total * {sampling:UInt32} / 50 * zoom_factor), 1/5) AS transparency,
-    255 * (0.4 + 0.6 * transparency) AS alpha,
-    255 * (1 - p) AS red, 128 AS green, 255 * p AS blue
+    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
+    (
+        SELECT groupArray((sx, sy, val))
+        FROM (
+            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
+                   (mercator_y - tile_y_begin) / px_scale AS sy,
+                   pressure AS val
+            FROM {table:Identifier}
+            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
+              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size AND pressure > 100
+            ORDER BY cityHash64(station) LIMIT 250
+        )
+    ) AS stations,
 
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile AND isNotNull(pressure)
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
-"Stations": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
-    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
-    tile_size * {x:UInt32} AS tile_x_begin,
-    tile_size * ({x:UInt32} + 1) AS tile_x_end,
-    tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size * ({y:UInt32} + 1) AS tile_y_end,
-    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
-    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    bitShiftRight(mercator_x - tile_x_begin, 32 - 10 - {z:UInt8}) AS x,
-    bitShiftRight(mercator_y - tile_y_begin, 32 - 10 - {z:UInt8}) AS y,
-    y * 1024 + x AS pos,
+    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
+    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
 
-    count() * {sampling:UInt32} AS total,
-    pow(least(1, total / 5 * zoom_factor), 1/5) AS color1,
-    pow(least(1, total / 500 * zoom_factor), 1/5) AS color2,
-    pow(least(1, total / 50000 * zoom_factor), 1/5) AS color3,
-    255 AS alpha,
-    color1 * 255 AS red, color2 * 255 AS green, color3 * 255 AS blue
+    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
+    arrayMap(c -> (
+        ((c % 128) * 8 + 4)::Float64 AS cx,
+        ((c DIV 128) * 8 + 4)::Float64 AS cy,
+        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
+          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
+         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
+    ).3, range(128 * 128)) AS grid
 
-SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
-FROM {table:Identifier}
-WHERE in_tile
-GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
+SELECT
+    round(255 * m)::UInt8 AS red,
+    round(80 + 60 * (1 - abs(m - 0.5) * 2))::UInt8 AS green,
+    round(255 * (1 - m))::UInt8 AS blue,
+    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+FROM (
+    SELECT
+        (number % 1024) AS x, (number DIV 1024) AS y,
+        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
+        cell.1 AS val, cell.2 AS d,
+        greatest(0, least(1, (val - 985) / 55)) AS m
+    FROM numbers(1024 * 1024)
+)`
         }
     },
 
