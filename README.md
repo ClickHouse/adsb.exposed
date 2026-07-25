@@ -460,6 +460,8 @@ The report is calculated for flight numbers, aircraft types, registration (tail 
 
 As a bonus, if you move the cursor over an aircraft type, it will go to Wikipedia API and try to find a picture of this aircraft. It often finds something else on Wikipedia, though.
 
+The panel takes 20% of the window by default, which is not always the right amount — long lists of owners want more room, and a map you are looking at closely wants less. You can drag its left border to resize it, and double-click the border to go back to the automatic width. The panel is the second column of the page's CSS grid, so resizing it is a matter of setting that column's width; the map is told to re-measure while you drag, because Leaflet caches the size of its container.
+
 ### Saved Queries
 
 You can edit a query and then share a link. The query is converted to a 128-bit hash and saved in the same ClickHouse database:
