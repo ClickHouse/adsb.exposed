@@ -14,8 +14,10 @@ CREATE TABLE taxi_mercator
 
     lat Float64,               -- pickup latitude (the plotted point)
     lon Float64,               -- pickup longitude
-    pickup_datetime DateTime,
-    dropoff_datetime DateTime,
+    -- The TLC records wall-clock local time, so the column carries the NYC timezone
+    -- explicitly and the loader parses the source strings as America/New_York.
+    pickup_datetime DateTime('America/New_York'),
+    dropoff_datetime DateTime('America/New_York'),
     dropoff_lat Float64,
     dropoff_lon Float64,
     passenger_count UInt8,

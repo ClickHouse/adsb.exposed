@@ -17,8 +17,8 @@ INSERT INTO taxi_mercator
 SELECT
     toFloat64(c10) AS lat,
     toFloat64(c9) AS lon,
-    parseDateTimeBestEffortOrZero(c4) AS pickup_datetime,
-    parseDateTimeBestEffortOrZero(c6) AS dropoff_datetime,
+    parseDateTimeBestEffortOrZero(c4, 'America/New_York') AS pickup_datetime,
+    parseDateTimeBestEffortOrZero(c6, 'America/New_York') AS dropoff_datetime,
     toFloat64(c12) AS dropoff_lat,
     toFloat64(c11) AS dropoff_lon,
     toUInt8OrZero(c13) AS passenger_count,
