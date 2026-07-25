@@ -43,9 +43,28 @@
         body {
             display: grid;
             grid-template-columns: auto 0%;
+            /* One track per element of the page, top to bottom: the ClickHouse banner, the
+               datasets row, the query, the examples row, the time slider, the stats line,
+               and the map, which takes whatever height is left. */
             grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) fit-content(2.6em) 1em auto;
             grid-gap: 0;
         }
+
+        /* Every grid item names its track explicitly. Auto-placement would be enough only
+           while all of them are visible: it skips `display: none` items, so hiding the time
+           slider (a dataset without a time column, like Population or Buildings) used to
+           shift the stats line and the map up a track each, landing the map in the 1em stats
+           track — it rendered as a sliver and no amount of invalidateSize() could grow it,
+           because it was the grid, not Leaflet, that had the wrong size. An empty track is
+           sized to zero anyway, so the hidden slider leaves no gap behind. */
+        #proud { grid-row: 1; }
+        #datasets { grid-row: 2; }
+        #query { grid-row: 3; }
+        #examples { grid-row: 4; }
+        #timeslider { grid-row: 5; }
+        #stats { grid-row: 6; }
+        #map { grid-row: 7; }
+        #report { grid-row: 7; grid-column: 2; }
 
         /* The report panel lives in the second grid column, which stays collapsed to zero
            width while there is no report. The two states are switched with a class rather
@@ -842,8 +861,8 @@
             updateMap();
 
             /// The controls above the map (examples, reports, time slider) change height
-            /// between datasets, which resizes the map's grid cell. Re-measure after the
-            /// reflow so Leaflet fills the new size instead of rendering shrunk.
+            /// between datasets, which resizes the map's grid cell. Re-measure once the new
+            /// sizes are laid out, so Leaflet loads tiles for the whole cell.
             if (typeof map !== 'undefined' && map) {
                 requestAnimationFrame(() => requestAnimationFrame(() => map.invalidateSize()));
             }
@@ -1557,8 +1576,9 @@
         function updateTimeSlider() {
             /// Showing/hiding the slider changes the map's height, so Leaflet must re-measure,
             /// otherwise it keeps the stale size and leaves part of the map unloaded.
-            /// Defer to after the grid reflow (next frame), else Leaflet reads the old size
-            /// and the map renders shrunk into a corner.
+            /// Deferred to the next frame, so that the grid has been laid out again by the
+            /// time Leaflet reads the new height. The slider keeps its own grid track while
+            /// hidden — see the `grid-row` declarations.
             const want = config.time ? 'block' : 'none';
             if (timeslider_elem.style.display !== want) {
                 timeslider_elem.style.display = want;
