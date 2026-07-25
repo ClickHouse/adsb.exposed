@@ -3659,9 +3659,13 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
-    least(1, avgIf(tip_amount / fare_amount, fare_amount > 0) / 0.3) AS tip,
-    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * (1 - tip) AS red, 255 * tip AS green, 64 AS blue
+    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    least(1, greatest(0, avgIf(tip_amount / fare_amount, fare_amount > 0) / 0.3)) AS m,
+
+    255 * conf AS alpha,
+    255 * (1 - m) AS red,
+    255 * m AS green,
+    40 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3681,9 +3685,13 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
-    least(1, avg(trip_distance) / 10) AS d,
-    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * d AS red, 128 * (0.4 + 0.6 * transparency) AS green, 255 * (1 - d) AS blue
+    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    least(1, avg(trip_distance) / 10) AS m,
+
+    255 * conf AS alpha,
+    255 * m AS red,
+    255 * m AS green,
+    255 * (1 - m) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3703,9 +3711,13 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
-    least(1, avgIf(fare_amount, fare_amount > 0) / 60) AS f,
-    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * f AS red, 255 * (1 - f) AS green, 64 AS blue
+    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    least(1, avgIf(fare_amount, fare_amount > 0) / 60) AS m,
+
+    255 * conf AS alpha,
+    255 * m AS red,
+    255 * (1 - m) AS green,
+    40 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3725,9 +3737,13 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
-    pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
-    avg(toHour(pickup_datetime) < 6 OR toHour(pickup_datetime) >= 22) AS night,
-    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * night AS red, 64 AS green, 255 * (1 - night) AS blue
+    least(1, total / greatest(1, 60000000 DIV zoom_factor)) AS conf,
+    avg(toHour(pickup_datetime) < 6 OR toHour(pickup_datetime) >= 22) AS m,
+
+    255 * conf AS alpha,
+    255 * (1 - m) AS red,
+    180 * (1 - m) AS green,
+    255 * m AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
