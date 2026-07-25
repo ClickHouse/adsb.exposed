@@ -19,7 +19,9 @@ INSERT INTO gbif_mercator
 SELECT
     decimallatitude AS lat,
     decimallongitude AS lon,
-    if(eventdate > toDateTime64('1900-01-01', 3) AND eventdate <= now(), toDate(eventdate), toDate('1970-01-01')) AS eventdate,
+    -- Date can only represent 1970..2149; a pre-1970 timestamp would wrap to a bogus future
+    -- date, so clamp the valid window to [1970, now] and send everything else to the sentinel.
+    if(eventdate >= toDateTime64('1970-01-01', 3) AND eventdate <= now(), toDate(eventdate), toDate('1970-01-01')) AS eventdate,
     toUInt16(greatest(0, ifNull(year, 0))) AS year,
     kingdom, phylum, class, \"order\", family, genus, species,
     scientificname, taxonrank, basisofrecord, countrycode,
