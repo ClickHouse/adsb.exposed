@@ -31,12 +31,9 @@ CREATE TABLE osm_history_mercator
     power LowCardinality(String) MATERIALIZED tags['power']
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE osm_history_mercator_sample10 AS osm_history_mercator;
 CREATE TABLE osm_history_mercator_sample100 AS osm_history_mercator;
 
-CREATE MATERIALIZED VIEW osm_history_view_sample10 TO osm_history_mercator_sample10 AS SELECT * FROM osm_history_mercator WHERE rand() % 10 = 0;
 CREATE MATERIALIZED VIEW osm_history_view_sample100 TO osm_history_mercator_sample100 AS SELECT * FROM osm_history_mercator WHERE rand() % 100 = 0;
 
 GRANT SELECT ON default.osm_history_mercator TO website;
-GRANT SELECT ON default.osm_history_mercator_sample10 TO website;
 GRANT SELECT ON default.osm_history_mercator_sample100 TO website;

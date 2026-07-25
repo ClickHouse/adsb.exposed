@@ -23,12 +23,4 @@ CREATE TABLE inat_mercator
     observer_id UInt32
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), observed_on);
 
-CREATE TABLE inat_mercator_sample10 AS inat_mercator;
-CREATE TABLE inat_mercator_sample100 AS inat_mercator;
-
-CREATE MATERIALIZED VIEW inat_view_sample10 TO inat_mercator_sample10 AS SELECT * FROM inat_mercator WHERE rand() % 10 = 0;
-CREATE MATERIALIZED VIEW inat_view_sample100 TO inat_mercator_sample100 AS SELECT * FROM inat_mercator WHERE rand() % 100 = 0;
-
 GRANT SELECT ON default.inat_mercator TO website;
-GRANT SELECT ON default.inat_mercator_sample10 TO website;
-GRANT SELECT ON default.inat_mercator_sample100 TO website;

@@ -19,12 +19,4 @@ CREATE TABLE glm_mercator
     area Float32      -- flash footprint, m^2
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE glm_mercator_sample10 AS glm_mercator;
-CREATE TABLE glm_mercator_sample100 AS glm_mercator;
-
-CREATE MATERIALIZED VIEW glm_view_sample10 TO glm_mercator_sample10 AS SELECT * FROM glm_mercator WHERE rand() % 10 = 0;
-CREATE MATERIALIZED VIEW glm_view_sample100 TO glm_mercator_sample100 AS SELECT * FROM glm_mercator WHERE rand() % 100 = 0;
-
 GRANT SELECT ON default.glm_mercator TO website;
-GRANT SELECT ON default.glm_mercator_sample10 TO website;
-GRANT SELECT ON default.glm_mercator_sample100 TO website;

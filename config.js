@@ -2622,10 +2622,9 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         levels: [
             { table: 'gbif_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'gbif_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'gbif_mercator',           sample: 1,   priority: 3 },
+            { table: 'gbif_mercator', sample: 1, priority: 2 },
         ],
-        time: { column: 'eventdate', exclude: "eventdate > '1900-01-01'" },
+        time: { column: 'eventdate', exclude: "eventdate > '1970-01-01'" },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
@@ -2665,6 +2664,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     WHERE class != '' AND ${condition}
                     GROUP BY class ORDER BY c DESC LIMIT 50`),
                 field: 'class',
+                wiki_field: 'class',
                 id: 'report_classes',
                 title: 'Class: ',
                 separator: ', ',
@@ -2678,6 +2678,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                     WHERE kingdom != '' AND ${condition}
                     GROUP BY kingdom ORDER BY c DESC LIMIT 20`),
                 field: 'kingdom',
+                wiki_field: 'kingdom',
                 id: 'report_kingdoms',
                 title: 'Kingdom: ',
                 separator: ', ',
@@ -2775,9 +2776,12 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
+    cityHash64(family) AS hash,
     pow(least(1, total / 300 * zoom_factor), 1/5) AS transparency,
-    255 * (0.25 + 0.75 * transparency) AS alpha,
-    255*transparency AS red, 64 AS green, 255*(1-transparency) AS blue
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -2797,9 +2801,12 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
+    cityHash64(family) AS hash,
     pow(least(1, total / 100 * zoom_factor), 1/5) AS transparency,
-    255 * (0.25 + 0.75 * transparency) AS alpha,
-    255 AS red, 200*transparency AS green, 64 AS blue
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -2819,9 +2826,12 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
+    cityHash64(family) AS hash,
     pow(least(1, total / 300 * zoom_factor), 1/5) AS transparency,
-    255 * (0.25 + 0.75 * transparency) AS alpha,
-    64 AS red, 255*transparency AS green, 255*(1-transparency) AS blue
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -2841,9 +2851,12 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
+    cityHash64(family) AS hash,
     pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
-    255 * (0.25 + 0.75 * transparency) AS alpha,
-    64 AS red, 255*(0.3+0.7*transparency) AS green, 64 AS blue
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -2863,9 +2876,12 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     y * 1024 + x AS pos,
 
     count() * {sampling:UInt32} AS total,
+    cityHash64(family) AS hash,
     pow(least(1, total / 50 * zoom_factor), 1/5) AS transparency,
-    255 * (0.25 + 0.75 * transparency) AS alpha,
-    255*transparency AS red, 128*transparency AS green, 255 AS blue
+    (0.35 + 0.65 * transparency) * 255 AS alpha,
+    avg(hash MOD 256) AS red,
+    avg(hash DIV 256 MOD 256) AS green,
+    avg(hash DIV 65536 MOD 256) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -2887,7 +2903,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 100 * zoom_factor), 1/5) AS transparency,
     greatest(0, avg(toYear(eventdate) - 1950) / (2025 - 1950)) AS rel,
-    255 * transparency AS alpha,
+    255 * (0.35 + 0.65 * transparency) AS alpha,
     255 * (1 - rel) AS red,
     255 * rel AS green,
     64 AS blue
@@ -2915,8 +2931,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         levels: [
             { table: 'osm_history_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'osm_history_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'osm_history_mercator',           sample: 1,   priority: 3 },
+            { table: 'osm_history_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'timestamp' },
         report_total: {
@@ -2996,7 +3011,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
     greatest(0, avg(timestamp::Int64 - '2005-01-01'::DateTime::Int64) / (now()::Int64 - '2005-01-01'::DateTime::Int64)) AS rel,
-    255 * transparency AS alpha,
+    255 * (0.35 + 0.65 * transparency) AS alpha,
     255 * (1 - rel) AS red, 255 * rel AS green, 0 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
@@ -3042,7 +3057,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
     least(1, (avg(version) - 1) / 5) AS hot,
-    255 * transparency AS alpha,
+    255 * (0.35 + 0.65 * transparency) AS alpha,
     255 * hot AS red, 64 * hot AS green, 255 * (1 - hot) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
@@ -3065,8 +3080,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 20000 * zoom_factor), 1/5) AS transparency,
     least(1, uniq(id) > 0 ? count() / uniq(id) / 6 : 0) AS churn,
-    255 * transparency AS alpha,
-    255 * churn AS red, 128 * transparency AS green, 255 * (1 - churn) AS blue
+    255 * (0.35 + 0.65 * transparency) AS alpha,
+    255 * churn AS red, 128 * (0.35 + 0.65 * transparency) AS green, 255 * (1 - churn) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3090,8 +3105,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         levels: [
             { table: 'overture_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'overture_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'overture_mercator',           sample: 1,   priority: 3 },
+            { table: 'overture_mercator', sample: 1, priority: 2 },
         ],
         report_total: {
             query: (condition => `
@@ -3277,8 +3291,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         levels: [
             { table: 'isd_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'isd_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'isd_mercator',           sample: 1,   priority: 3 },
+            { table: 'isd_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'timestamp' },
         report_total: {
@@ -3415,9 +3428,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'inat_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'inat_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'inat_mercator',           sample: 1,   priority: 3 },
+            { table: 'inat_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'observed_on', exclude: "observed_on > '2008-01-01'" },
         report_total: {
@@ -3585,6 +3596,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
     "Taxi": {
         notice: "NYC TLC trip records (coordinate-bearing archive), public domain",
+        bounds: [[40.55, -74.10], [40.90, -73.70]],
         endpoints: [
             {
                 name: "Cloud (Real-Time)",
@@ -3598,8 +3610,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         levels: [
             { table: 'taxi_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'taxi_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'taxi_mercator',           sample: 1,   priority: 3 },
+            { table: 'taxi_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'pickup_datetime' },
         report_total: {
@@ -3651,7 +3662,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
     least(1, avgIf(tip_amount / fare_amount, fare_amount > 0) / 0.3) AS tip,
-    255 * transparency AS alpha, 255 * (1 - tip) AS red, 255 * tip AS green, 64 AS blue
+    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * (1 - tip) AS red, 255 * tip AS green, 64 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3673,7 +3684,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
     least(1, avg(trip_distance) / 10) AS d,
-    255 * transparency AS alpha, 255 * d AS red, 128 * transparency AS green, 255 * (1 - d) AS blue
+    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * d AS red, 128 * (0.4 + 0.6 * transparency) AS green, 255 * (1 - d) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3695,7 +3706,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
     least(1, avgIf(fare_amount, fare_amount > 0) / 60) AS f,
-    255 * transparency AS alpha, 255 * f AS red, 255 * (1 - f) AS green, 64 AS blue
+    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * f AS red, 255 * (1 - f) AS green, 64 AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3717,7 +3728,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
     count() * {sampling:UInt32} AS total,
     pow(least(1, total / 500 * zoom_factor), 1/5) AS transparency,
     avg(toHour(pickup_datetime) < 6 OR toHour(pickup_datetime) >= 22) AS night,
-    255 * transparency AS alpha, 255 * night AS red, 64 AS green, 255 * (1 - night) AS blue
+    255 * (0.4 + 0.6 * transparency) AS alpha, 255 * night AS red, 64 AS green, 255 * (1 - night) AS blue
 
 SELECT round(red)::UInt8, round(green)::UInt8, round(blue)::UInt8, round(alpha)::UInt8
 FROM {table:Identifier}
@@ -3740,9 +3751,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'firms_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'firms_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'firms_mercator',           sample: 1,   priority: 3 },
+            { table: 'firms_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'acq_date' },
         report_total: {
@@ -3873,9 +3882,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'glm_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'glm_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'glm_mercator',           sample: 1,   priority: 3 },
+            { table: 'glm_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'timestamp' },
         report_total: {
@@ -4053,6 +4060,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
 
     "Transit": {
         notice: "Live GTFS-Realtime vehicle positions © transit agencies",
+        bounds: [[42.20, -71.30], [42.55, -70.95]],
         endpoints: [
             {
                 name: "Cloud (Real-Time)",
@@ -4065,9 +4073,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'gtfs_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'gtfs_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'gtfs_mercator',           sample: 1,   priority: 3 },
+            { table: 'gtfs_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'timestamp' },
         report_total: {

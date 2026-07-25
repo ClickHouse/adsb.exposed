@@ -24,12 +24,9 @@ CREATE TABLE taxi_mercator
     tip_amount Float32
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), pickup_datetime);
 
-CREATE TABLE taxi_mercator_sample10 AS taxi_mercator;
 CREATE TABLE taxi_mercator_sample100 AS taxi_mercator;
 
-CREATE MATERIALIZED VIEW taxi_view_sample10 TO taxi_mercator_sample10 AS SELECT * FROM taxi_mercator WHERE rand() % 10 = 0;
 CREATE MATERIALIZED VIEW taxi_view_sample100 TO taxi_mercator_sample100 AS SELECT * FROM taxi_mercator WHERE rand() % 100 = 0;
 
 GRANT SELECT ON default.taxi_mercator TO website;
-GRANT SELECT ON default.taxi_mercator_sample10 TO website;
 GRANT SELECT ON default.taxi_mercator_sample100 TO website;

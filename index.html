@@ -828,6 +828,15 @@
                 });
             });
 
+            /// Some datasets only have data in a specific region (e.g. NYC taxi). If the
+            /// current view doesn't overlap that region, jump to it so the user sees data.
+            if (config.bounds && typeof map !== 'undefined' && map) {
+                const region = L.latLngBounds(config.bounds);
+                if (!map.getBounds().intersects(region)) {
+                    map.fitBounds(region);
+                }
+            }
+
             cached_tiles = {};
             last_tile_image = {};
             updateMap();

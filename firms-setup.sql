@@ -23,12 +23,4 @@ CREATE TABLE firms_mercator
     country LowCardinality(String)
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), acq_date);
 
-CREATE TABLE firms_mercator_sample10 AS firms_mercator;
-CREATE TABLE firms_mercator_sample100 AS firms_mercator;
-
-CREATE MATERIALIZED VIEW firms_view_sample10 TO firms_mercator_sample10 AS SELECT * FROM firms_mercator WHERE rand() % 10 = 0;
-CREATE MATERIALIZED VIEW firms_view_sample100 TO firms_mercator_sample100 AS SELECT * FROM firms_mercator WHERE rand() % 100 = 0;
-
 GRANT SELECT ON default.firms_mercator TO website;
-GRANT SELECT ON default.firms_mercator_sample10 TO website;
-GRANT SELECT ON default.firms_mercator_sample100 TO website;
