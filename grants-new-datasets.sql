@@ -11,6 +11,7 @@ GRANT SELECT ON default.glm_mercator TO website;
 GRANT SELECT ON default.gtfs_mercator TO website;
 GRANT SELECT ON default.inat_mercator TO website;
 GRANT SELECT ON default.isd_mercator TO website;
+GRANT SELECT ON default.isd_mercator_sample10 TO website;
 GRANT SELECT ON default.isd_stations TO website;
 GRANT SELECT ON default.osm_history_mercator TO website;
 GRANT SELECT ON default.osm_history_mercator_sample10 TO website;
