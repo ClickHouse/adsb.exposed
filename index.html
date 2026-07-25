@@ -22,8 +22,6 @@
 
             --progress-background-color: var(--progress-background-color4);
             --progress-foreground-color: var(--progress-foreground-color4);
-
-            --report-width: 0%;
         }
         * {
             box-sizing: border-box;
@@ -40,9 +38,20 @@
 
         body {
             display: grid;
-            grid-template-columns: auto var(--report-width);
+            grid-template-columns: auto 0%;
             grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) fit-content(2.6em) 1em auto;
             grid-gap: 0;
+        }
+
+        /* The report panel lives in the second grid column, which stays collapsed to zero
+           width while there is no report. The two states are switched with a class rather
+           than by rewriting a `--report-width` variable interpolated into
+           `grid-template-columns`, because in Firefox the column sometimes kept its old
+           width and the panel would not go away (issue #3). A plain class toggle changes
+           the declared value of the property itself, which does not depend on Firefox
+           invalidating the grid layout when only a custom property changes. */
+        body.report-open {
+            grid-template-columns: auto fit-content(20%);
         }
 
         #proud {
@@ -1908,7 +1917,7 @@
 
             for (node of document.getElementById('report').childNodes) { node.textContent = '' };
             document.getElementById('report').style.display = 'block';
-            document.documentElement.style.setProperty('--report-width', 'fit-content(20%)');
+            document.body.classList.add('report-open');
 
             const current_query = query_elem.value;
 
@@ -2169,7 +2178,7 @@
         function hideReport() {
             selected_box = [];
             document.getElementById('report').style.display = 'none';
-            document.documentElement.style.setProperty('--report-width', '0%');
+            document.body.classList.remove('report-open');
             let picture = document.getElementById('picture');
             picture.style.display = 'none';
             picture.firstChild.src = '';
