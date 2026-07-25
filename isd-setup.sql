@@ -23,9 +23,9 @@ CREATE TABLE isd_mercator
     pressure Nullable(Float32)       -- hPa (sea level)
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE isd_mercator_sample100 AS isd_mercator;
+CREATE TABLE isd_mercator_sample10 AS isd_mercator;
 
-CREATE MATERIALIZED VIEW isd_view_sample100 TO isd_mercator_sample100 AS SELECT * FROM isd_mercator WHERE rand() % 100 = 0;
+CREATE MATERIALIZED VIEW isd_view_sample10 TO isd_mercator_sample10 AS SELECT * FROM isd_mercator WHERE rand() % 10 = 0;
 
 GRANT SELECT ON default.isd_mercator TO website;
-GRANT SELECT ON default.isd_mercator_sample100 TO website;
+GRANT SELECT ON default.isd_mercator_sample10 TO website;

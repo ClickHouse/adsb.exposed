@@ -32,9 +32,9 @@ CREATE TABLE gbif_mercator
     license LowCardinality(String)
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), eventdate);
 
-CREATE TABLE gbif_mercator_sample100 AS gbif_mercator;
+CREATE TABLE gbif_mercator_sample10 AS gbif_mercator;
 
-CREATE MATERIALIZED VIEW gbif_view_sample100 TO gbif_mercator_sample100 AS SELECT * FROM gbif_mercator WHERE rand() % 100 = 0;
+CREATE MATERIALIZED VIEW gbif_view_sample10 TO gbif_mercator_sample10 AS SELECT * FROM gbif_mercator WHERE rand() % 10 = 0;
 
 GRANT SELECT ON default.gbif_mercator TO website;
-GRANT SELECT ON default.gbif_mercator_sample100 TO website;
+GRANT SELECT ON default.gbif_mercator_sample10 TO website;

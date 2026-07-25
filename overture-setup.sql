@@ -22,9 +22,9 @@ CREATE TABLE overture_mercator
     roof_shape LowCardinality(String)
 ) ENGINE = MergeTree ORDER BY mortonEncode(mercator_x, mercator_y);
 
-CREATE TABLE overture_mercator_sample100 AS overture_mercator;
+CREATE TABLE overture_mercator_sample10 AS overture_mercator;
 
-CREATE MATERIALIZED VIEW overture_view_sample100 TO overture_mercator_sample100 AS SELECT * FROM overture_mercator WHERE rand() % 100 = 0;
+CREATE MATERIALIZED VIEW overture_view_sample10 TO overture_mercator_sample10 AS SELECT * FROM overture_mercator WHERE rand() % 10 = 0;
 
 GRANT SELECT ON default.overture_mercator TO website;
-GRANT SELECT ON default.overture_mercator_sample100 TO website;
+GRANT SELECT ON default.overture_mercator_sample10 TO website;

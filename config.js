@@ -2621,7 +2621,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'gbif_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'gbif_mercator_sample10', sample: 10, priority: 1 },
             { table: 'gbif_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'eventdate', exclude: "eventdate > '1970-01-01'" },
@@ -2930,7 +2930,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'osm_history_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'osm_history_mercator_sample10', sample: 10, priority: 1 },
             { table: 'osm_history_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'timestamp' },
@@ -3104,7 +3104,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'overture_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'overture_mercator_sample10', sample: 10, priority: 1 },
             { table: 'overture_mercator', sample: 1, priority: 2 },
         ],
         report_total: {
@@ -3290,7 +3290,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'isd_mercator_sample100', sample: 100, priority: 1 },
+            { table: 'isd_mercator_sample10', sample: 10, priority: 1 },
             { table: 'isd_mercator', sample: 1, priority: 2 },
         ],
         time: { column: 'timestamp' },
@@ -3609,8 +3609,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'taxi_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'taxi_mercator', sample: 1, priority: 2 },
+            { table: 'taxi_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'pickup_datetime' },
         report_total: {

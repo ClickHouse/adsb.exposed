@@ -840,6 +840,13 @@
             cached_tiles = {};
             last_tile_image = {};
             updateMap();
+
+            /// The controls above the map (examples, reports, time slider) change height
+            /// between datasets, which resizes the map's grid cell. Re-measure after the
+            /// reflow so Leaflet fills the new size instead of rendering shrunk.
+            if (typeof map !== 'undefined' && map) {
+                requestAnimationFrame(() => requestAnimationFrame(() => map.invalidateSize()));
+            }
         }
 
         /// The faint outlines under the density layer deserve the same treatment as the
@@ -1550,10 +1557,14 @@
         function updateTimeSlider() {
             /// Showing/hiding the slider changes the map's height, so Leaflet must re-measure,
             /// otherwise it keeps the stale size and leaves part of the map unloaded.
+            /// Defer to after the grid reflow (next frame), else Leaflet reads the old size
+            /// and the map renders shrunk into a corner.
             const want = config.time ? 'block' : 'none';
             if (timeslider_elem.style.display !== want) {
                 timeslider_elem.style.display = want;
-                if (typeof map !== 'undefined' && map) map.invalidateSize();
+                if (typeof map !== 'undefined' && map) {
+                    requestAnimationFrame(() => requestAnimationFrame(() => map.invalidateSize()));
+                }
             }
             if (!config.time) return;
 
