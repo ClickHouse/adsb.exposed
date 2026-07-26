@@ -3333,46 +3333,63 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(255*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
-SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
-SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
-SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
-SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
-SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
-SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 65536)((s, c), cell)
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
+                  + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(temperature, isNotNull(temperature)), 0.0) AS s, countIf(isNotNull(temperature)) AS c
-            FROM {table:Identifier}
-            WHERE in_tile
-            GROUP BY cell )
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-) ) AS px
+            FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g0[number] AS e FROM numbers(1, 65536) ) GROUP BY blk ) ) AS g1,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 128) DIV 2) * 64 + ((idx % 128) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g1[number] AS e FROM numbers(1, 16384) ) GROUP BY blk ) ) AS g2,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 1024)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 64) DIV 2) * 32 + ((idx % 64) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g2[number] AS e FROM numbers(1, 4096) ) GROUP BY blk ) ) AS g3,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 256)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
+            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
+            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
+            if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(1024) ) ) AS L3,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 4096)(
+            if(g2[i+1].2 > 0, (toNullable(g2[i+1].1 / g2[i+1].2), toUInt8(2)), L3[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(4096) ) ) AS L2,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16384)(
+            if(g1[i+1].2 > 0, (toNullable(g1[i+1].1 / g1[i+1].2), toUInt8(1)), L2[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16384) ) ) AS L1,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 65536)(
+            if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0)), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(255*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21,15][t.2 + 1]), 24)) ).4, i)
+        FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT number AS n, px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )
+FROM ( SELECT number AS n, px[(number DIV 1024 DIV 4) * 256 + (number % 1024 DIV 4) + 1] AS rgba FROM numbers(1024 * 1024) )
 ORDER BY n`,
 "Wind": `WITH
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -3380,46 +3397,63 @@ ORDER BY n`,
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(120*(1-m))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
-SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
-SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
-SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
-SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
-SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
-SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 65536)((s, c), cell)
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
+                  + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(wind_speed, isNotNull(wind_speed)), 0.0) AS s, countIf(isNotNull(wind_speed)) AS c
-            FROM {table:Identifier}
-            WHERE in_tile
-            GROUP BY cell )
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-) ) AS px
+            FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g0[number] AS e FROM numbers(1, 65536) ) GROUP BY blk ) ) AS g1,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 128) DIV 2) * 64 + ((idx % 128) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g1[number] AS e FROM numbers(1, 16384) ) GROUP BY blk ) ) AS g2,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 1024)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 64) DIV 2) * 32 + ((idx % 64) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g2[number] AS e FROM numbers(1, 4096) ) GROUP BY blk ) ) AS g3,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 256)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
+            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
+            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
+            if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(1024) ) ) AS L3,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 4096)(
+            if(g2[i+1].2 > 0, (toNullable(g2[i+1].1 / g2[i+1].2), toUInt8(2)), L3[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(4096) ) ) AS L2,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16384)(
+            if(g1[i+1].2 > 0, (toNullable(g1[i+1].1 / g1[i+1].2), toUInt8(1)), L2[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16384) ) ) AS L1,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 65536)(
+            if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0)), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(120*(1-m))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21,15][t.2 + 1]), 24)) ).4, i)
+        FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT number AS n, px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )
+FROM ( SELECT number AS n, px[(number DIV 1024 DIV 4) * 256 + (number % 1024 DIV 4) + 1] AS rgba FROM numbers(1024 * 1024) )
 ORDER BY n`,
 "Pressure": `WITH
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -3427,46 +3461,63 @@ ORDER BY n`,
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(80+60*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
-SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
-SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
-SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
-SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
-SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
-SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 65536)((s, c), cell)
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
+                  + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(pressure, isNotNull(pressure)), 0.0) AS s, countIf(isNotNull(pressure)) AS c
-            FROM {table:Identifier}
-            WHERE in_tile
-            GROUP BY cell )
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-)
-) ) AS px
+            FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g0[number] AS e FROM numbers(1, 65536) ) GROUP BY blk ) ) AS g1,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 128) DIV 2) * 64 + ((idx % 128) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g1[number] AS e FROM numbers(1, 16384) ) GROUP BY blk ) ) AS g2,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 1024)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 64) DIV 2) * 32 + ((idx % 64) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g2[number] AS e FROM numbers(1, 4096) ) GROUP BY blk ) ) AS g3,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 256)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
+            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
+            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
+            if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(1024) ) ) AS L3,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 4096)(
+            if(g2[i+1].2 > 0, (toNullable(g2[i+1].1 / g2[i+1].2), toUInt8(2)), L3[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(4096) ) ) AS L2,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16384)(
+            if(g1[i+1].2 > 0, (toNullable(g1[i+1].1 / g1[i+1].2), toUInt8(1)), L2[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16384) ) ) AS L1,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 65536)(
+            if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0)), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(80+60*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21,15][t.2 + 1]), 24)) ).4, i)
+        FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT number AS n, px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )
+FROM ( SELECT number AS n, px[(number DIV 1024 DIV 4) * 256 + (number % 1024 DIV 4) + 1] AS rgba FROM numbers(1024 * 1024) )
 ORDER BY n`
         }
     },
