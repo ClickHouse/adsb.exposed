@@ -3328,21 +3328,35 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
                 const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
                 let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} min/avg/max · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
+                // Normal bucket spacing (min gap between consecutive buckets); larger gaps = missing periods.
+                let step = Infinity;
+                for (let i = 1; i < rows.length; i++) { const dd = (+rows[i].day) - (+rows[i-1].day); if (dd > 0 && dd < step) step = dd; }
+                if (!isFinite(step)) step = 1;
                 for (const m of M) {
-                    let lo = Infinity, hi = -Infinity; const pts = [];
-                    for (const r of rows) { const a = r[m.lo], b = r[m.hi]; if (a == null || b == null) continue;
-                        const la = +a, hb = +b; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        pts.push([((+r.day - dmin)/span*W), la, hb, r[m.avg] == null ? null : +r[m.avg]]); }
-                    if (pts.length < 2) continue;
-                    const rng = (hi - lo) || 1, Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // faint min–max fill (max edge forward, min edge back) + bright 1px avg line
-                    const band = pts.map(p => p[0].toFixed(1)+','+Y(p[2])).concat(pts.slice().reverse().map(p => p[0].toFixed(1)+','+Y(p[1]))).join(' ');
-                    const line = pts.filter(p => p[3] != null).map(p => p[0].toFixed(1)+','+Y(p[3])).join(' ');
+                    let lo = Infinity, hi = -Infinity; const pres = [];
+                    for (const r of rows) { const a = r[m.lo]; if (a == null) continue;   // avg/hi share the same validity
+                        const la = +a, hb = +r[m.hi]; if (la < lo) lo = la; if (hb > hi) hi = hb;
+                        pres.push([+r.day, la, hb, +r[m.avg]]); }
+                    if (pres.length < 1) continue;
+                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
+                    // break into contiguous runs (no time gap); render each run separately so gaps stay empty
+                    let band = '', line = '', seg = [];
+                    const flush = () => {
+                        if (!seg.length) return;
+                        if (seg.length === 1) { const p = seg[0]; band += `M${X(p[0])},${Y(p[2])}L${X(p[0])},${Y(p[1])}`; }
+                        else {
+                            band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
+                            line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L');
+                        }
+                        seg = [];
+                    };
+                    for (let i = 0; i < pres.length; i++) { if (i > 0 && pres[i][0] - pres[i-1][0] > step * 1.5) flush(); seg.push(pres[i]); }
+                    flush();
                     out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
                         + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
-                        + `<polygon points="${band}" fill="${m.col}" fill-opacity="0.22" stroke="none"/>`
-                        + `<polyline points="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
+                        + `<path d="${band}" fill="${m.col}" fill-opacity="0.2" stroke="${m.col}" stroke-opacity="0.35" stroke-width="0.5" vector-effect="non-scaling-stroke"/>`
+                        + `<path d="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
                         + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
                 }
                 return out;
@@ -4017,21 +4031,35 @@ ORDER BY n`
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
                 const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
                 let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} min/avg/max · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
+                // Normal bucket spacing (min gap between consecutive buckets); larger gaps = missing periods.
+                let step = Infinity;
+                for (let i = 1; i < rows.length; i++) { const dd = (+rows[i].day) - (+rows[i-1].day); if (dd > 0 && dd < step) step = dd; }
+                if (!isFinite(step)) step = 1;
                 for (const m of M) {
-                    let lo = Infinity, hi = -Infinity; const pts = [];
-                    for (const r of rows) { const a = r[m.lo], b = r[m.hi]; if (a == null || b == null) continue;
-                        const la = +a, hb = +b; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        pts.push([((+r.day - dmin)/span*W), la, hb, r[m.avg] == null ? null : +r[m.avg]]); }
-                    if (pts.length < 2) continue;
-                    const rng = (hi - lo) || 1, Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // faint min–max fill (max edge forward, min edge back) + bright 1px avg line
-                    const band = pts.map(p => p[0].toFixed(1)+','+Y(p[2])).concat(pts.slice().reverse().map(p => p[0].toFixed(1)+','+Y(p[1]))).join(' ');
-                    const line = pts.filter(p => p[3] != null).map(p => p[0].toFixed(1)+','+Y(p[3])).join(' ');
+                    let lo = Infinity, hi = -Infinity; const pres = [];
+                    for (const r of rows) { const a = r[m.lo]; if (a == null) continue;   // avg/hi share the same validity
+                        const la = +a, hb = +r[m.hi]; if (la < lo) lo = la; if (hb > hi) hi = hb;
+                        pres.push([+r.day, la, hb, +r[m.avg]]); }
+                    if (pres.length < 1) continue;
+                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
+                    // break into contiguous runs (no time gap); render each run separately so gaps stay empty
+                    let band = '', line = '', seg = [];
+                    const flush = () => {
+                        if (!seg.length) return;
+                        if (seg.length === 1) { const p = seg[0]; band += `M${X(p[0])},${Y(p[2])}L${X(p[0])},${Y(p[1])}`; }
+                        else {
+                            band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
+                            line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L');
+                        }
+                        seg = [];
+                    };
+                    for (let i = 0; i < pres.length; i++) { if (i > 0 && pres[i][0] - pres[i-1][0] > step * 1.5) flush(); seg.push(pres[i]); }
+                    flush();
                     out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
                         + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
-                        + `<polygon points="${band}" fill="${m.col}" fill-opacity="0.22" stroke="none"/>`
-                        + `<polyline points="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
+                        + `<path d="${band}" fill="${m.col}" fill-opacity="0.2" stroke="${m.col}" stroke-opacity="0.35" stroke-width="0.5" vector-effect="non-scaling-stroke"/>`
+                        + `<path d="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
                         + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
                 }
                 return out;
