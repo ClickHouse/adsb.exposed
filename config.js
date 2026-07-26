@@ -3319,7 +3319,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 FROM {table:Identifier} WHERE ${condition}
                 GROUP BY bucket ORDER BY bucket`),
             html: (json => {
-                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_relative_humidity", "hi": "hi_relative_humidity", "avg": "avg_relative_humidity", "l": "Humidity", "u": "%", "col": "#1f9ec4", "d": 0}, {"lo": "lo_wet_bulb", "hi": "hi_wet_bulb", "avg": "avg_wet_bulb", "l": "Wet bulb", "u": "°C", "col": "#7a5ad0", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}];
+                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_relative_humidity", "hi": "hi_relative_humidity", "avg": "avg_relative_humidity", "l": "Humidity", "u": "%", "col": "#1f9ec4", "d": 0}, {"lo": "lo_wet_bulb", "hi": "hi_wet_bulb", "avg": "avg_wet_bulb", "l": "Wet bulb", "u": "°C", "col": "#7a5ad0", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "Pressure Δ3h", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}];
                 const rows = json.data || [];
                 if (!rows.length) return 'No data in the selected area.';
                 let obs = 0, dmin = Infinity, dmax = -Infinity;
@@ -3806,6 +3806,56 @@ ORDER BY n`,
             if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0), g0[i+1].2), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
     ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 50) AS m, if(isNull(v), 0, toUInt32(round(205-55*m)) + bitShiftLeft(toUInt32(round(224-24*m)), 8) + bitShiftLeft(toUInt32(round(246-6*m)), 16) + bitShiftLeft(toUInt32(round([255,178,125,87,61,43,30,21,15][t.2 + 1] * least(1.0, val / 15.0) * least(1.0, log2(1 + t.3) / 7.6511))), 24)) ).4, i)
+        FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
+SELECT
+    toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
+    toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
+FROM ( SELECT number AS n, px[(number DIV 1024 DIV 4) * 256 + (number % 1024 DIV 4) + 1] AS rgba FROM numbers(1024 * 1024) )
+ORDER BY n`,
+"Num Observations": `WITH
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin, tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 65536)((s, c), cell)
+        FROM (
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
+                  + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
+                  toFloat64(count()) AS s, toUInt64(1) AS c
+            FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g0[number] AS e FROM numbers(1, 65536) ) GROUP BY blk ) ) AS g1,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 128) DIV 2) * 64 + ((idx % 128) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g1[number] AS e FROM numbers(1, 16384) ) GROUP BY blk ) ) AS g2,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 1024)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 64) DIV 2) * 32 + ((idx % 64) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g2[number] AS e FROM numbers(1, 4096) ) GROUP BY blk ) ) AS g3,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 256)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),256)(
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4), g4[i+1].2), (CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),1024)(
+            if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3), g3[i+1].2), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(1024) ) ) AS L3,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),4096)(
+            if(g2[i+1].2 > 0, (toNullable(g2[i+1].1 / g2[i+1].2), toUInt8(2), g2[i+1].2), L3[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(4096) ) ) AS L2,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),16384)(
+            if(g1[i+1].2 > 0, (toNullable(g1[i+1].1 / g1[i+1].2), toUInt8(1), g1[i+1].2), L2[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16384) ) ) AS L1,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),65536)(
+            if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0), g0[i+1].2), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, log2(1 + val) / 17) AS m, if(isNull(v), 0, toUInt32(round(60+195*m)) + bitShiftLeft(toUInt32(round(30+200*m*m)), 8) + bitShiftLeft(toUInt32(round(130*(1-m))), 16) + bitShiftLeft(toUInt32(round([255,178,125,87,61,43,30,21,15][t.2 + 1] * m)), 24)) ).4, i)
         FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
@@ -3958,7 +4008,7 @@ ORDER BY n`
                 FROM {table:Identifier} WHERE ${condition}
                 GROUP BY bucket ORDER BY bucket`),
             html: (json => {
-                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}, {"lo": "lo_sea_surface_temp", "hi": "hi_sea_surface_temp", "avg": "avg_sea_surface_temp", "l": "Sea temp", "u": "°C", "col": "#1ba0b0", "d": 1}, {"lo": "lo_cloud_base", "hi": "hi_cloud_base", "avg": "avg_cloud_base", "l": "Cloud base", "u": "m", "col": "#93a2b0", "d": 0}];
+                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "Pressure Δ3h", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}, {"lo": "lo_sea_surface_temp", "hi": "hi_sea_surface_temp", "avg": "avg_sea_surface_temp", "l": "Sea temp", "u": "°C", "col": "#1ba0b0", "d": 1}, {"lo": "lo_cloud_base", "hi": "hi_cloud_base", "avg": "avg_cloud_base", "l": "Cloud base", "u": "m", "col": "#93a2b0", "d": 0}];
                 const rows = json.data || [];
                 if (!rows.length) return 'No data in the selected area.';
                 let obs = 0, dmin = Infinity, dmax = -Infinity;
@@ -4445,6 +4495,56 @@ ORDER BY n`,
             if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0), g0[i+1].2), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
     ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 50) AS m, if(isNull(v), 0, toUInt32(round(205-55*m)) + bitShiftLeft(toUInt32(round(224-24*m)), 8) + bitShiftLeft(toUInt32(round(246-6*m)), 16) + bitShiftLeft(toUInt32(round([255,178,125,87,61,43,30,21,15][t.2 + 1] * least(1.0, val / 15.0) * least(1.0, log2(1 + t.3) / 7.6511))), 24)) ).4, i)
+        FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
+SELECT
+    toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
+    toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
+FROM ( SELECT number AS n, px[(number DIV 1024 DIV 4) * 256 + (number % 1024 DIV 4) + 1] AS rgba FROM numbers(1024 * 1024) )
+ORDER BY n`,
+"Num Observations": `WITH
+    bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
+    tile_size * {x:UInt32} AS tile_x_begin, tile_size * ({x:UInt32} + 1) AS tile_x_end,
+    tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 65536)((s, c), cell)
+        FROM (
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
+                  + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
+                  toFloat64(count()) AS s, toUInt64(1) AS c
+            FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g0[number] AS e FROM numbers(1, 65536) ) GROUP BY blk ) ) AS g1,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 128) DIV 2) * 64 + ((idx % 128) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g1[number] AS e FROM numbers(1, 16384) ) GROUP BY blk ) ) AS g2,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 1024)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 64) DIV 2) * 32 + ((idx % 64) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g2[number] AS e FROM numbers(1, 4096) ) GROUP BY blk ) ) AS g3,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 256)((bs, bc), blk)
+        FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
+                      sum(e.1) AS bs, sum(e.2) AS bc
+               FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),256)(
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4), g4[i+1].2), (CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),1024)(
+            if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3), g3[i+1].2), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(1024) ) ) AS L3,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),4096)(
+            if(g2[i+1].2 > 0, (toNullable(g2[i+1].1 / g2[i+1].2), toUInt8(2), g2[i+1].2), L3[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(4096) ) ) AS L2,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),16384)(
+            if(g1[i+1].2 > 0, (toNullable(g1[i+1].1 / g1[i+1].2), toUInt8(1), g1[i+1].2), L2[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(16384) ) ) AS L1,
+    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9), toUInt64(0))::Tuple(Nullable(Float64), UInt8, UInt64),65536)(
+            if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0), g0[i+1].2), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
+        FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, log2(1 + val) / 17) AS m, if(isNull(v), 0, toUInt32(round(60+195*m)) + bitShiftLeft(toUInt32(round(30+200*m*m)), 8) + bitShiftLeft(toUInt32(round(130*(1-m))), 16) + bitShiftLeft(toUInt32(round([255,178,125,87,61,43,30,21,15][t.2 + 1] * m)), 24)) ).4, i)
         FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
