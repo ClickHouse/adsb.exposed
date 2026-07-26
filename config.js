@@ -3383,22 +3383,8 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3447,22 +3433,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3511,22 +3483,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3575,22 +3533,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3639,22 +3583,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3703,22 +3633,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3767,22 +3683,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3831,22 +3733,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
@@ -3895,22 +3783,8 @@ ORDER BY n`,
         FROM ( SELECT (((idx DIV 32) DIV 2) * 16 + ((idx % 32) DIV 2))::UInt32 AS blk,
                       sum(e.1) AS bs, sum(e.2) AS bc
                FROM ( SELECT number - 1 AS idx, g3[number] AS e FROM numbers(1, 1024) ) GROUP BY blk ) ) AS g4,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 64)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 16) DIV 2) * 8 + ((idx % 16) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g4[number] AS e FROM numbers(1, 256) ) GROUP BY blk ) ) AS g5,
-    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16)((bs, bc), blk)
-        FROM ( SELECT (((idx DIV 8) DIV 2) * 4 + ((idx % 8) DIV 2))::UInt32 AS blk,
-                      sum(e.1) AS bs, sum(e.2) AS bc
-               FROM ( SELECT number - 1 AS idx, g5[number] AS e FROM numbers(1, 64) ) GROUP BY blk ) ) AS g6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 16)(
-            if(g6[i+1].2 > 0, (toNullable(g6[i+1].1 / g6[i+1].2), toUInt8(6)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(16) ) ) AS L6,
-    ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 64)(
-            if(g5[i+1].2 > 0, (toNullable(g5[i+1].1 / g5[i+1].2), toUInt8(5)), L6[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), i)
-        FROM ( SELECT number::UInt32 AS i FROM numbers(64) ) ) AS L5,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 256)(
-            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), L5[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), i)
+            if(g4[i+1].2 > 0, (toNullable(g4[i+1].1 / g4[i+1].2), toUInt8(4)), (CAST(NULL AS Nullable(Float64)), toUInt8(9))), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(256) ) ) AS L4,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 1024)(
             if(g3[i+1].2 > 0, (toNullable(g3[i+1].1 / g3[i+1].2), toUInt8(3)), L4[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), i)
