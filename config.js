@@ -3290,18 +3290,22 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'isd_stations', sample: 1, priority: 1 },
+            { table: 'isd_mercator_sample10', sample: 10, priority: 1 },
+            { table: 'isd_mercator',          sample: 1,  priority: 2 },
         ],
+        time: { column: 'timestamp' },
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT count() AS stations, round(avg(temperature), 1) AS t
+                SELECT count() AS obs, uniq(station) AS stations,
+                    round(avgIf(temperature, isNotNull(temperature)), 1) AS t,
+                    min(timestamp) AS first, max(timestamp) AS last
                 FROM {table:Identifier} WHERE ${condition}`),
             content: (json => {
                 let row = json.data[0];
-                let text = `${Number(row.stations).toLocaleString()} weather stations.`;
-                if (row.stations > 0) text += ` Mean temperature: ${row.t}°C.`;
+                let text = `${Number(row.obs).toLocaleString()} observations from ${Number(row.stations).toLocaleString()} stations.`;
+                if (row.obs > 0) text += ` Mean temperature: ${row.t}°C. Time: ${row.first} — ${row.last}.`;
                 if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
                 return text;
             }),
@@ -3311,10 +3315,10 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 query: (condition => `
                     WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                         AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT name, round(temperature, 1) AS t, obs
+                    SELECT name, round(avgIf(temperature, isNotNull(temperature)), 1) AS t, count() AS c
                     FROM {table:Identifier}
                     WHERE name != '' AND ${condition}
-                    ORDER BY obs DESC LIMIT 100`),
+                    GROUP BY name ORDER BY c DESC LIMIT 100`),
                 field: 'name',
                 id: 'report_stations',
                 title: 'Stations: ',
@@ -3327,138 +3331,129 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size / 1024.0 AS px_scale,
-
-    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
-    (
-        SELECT groupArray((sx, sy, val))
-        FROM (
-            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
-                   (mercator_y - tile_y_begin) / px_scale AS sy,
-                   temperature AS val
-            FROM {table:Identifier}
-            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
-              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size
-            ORDER BY cityHash64(station) LIMIT 250
-        )
-    ) AS stations,
-
-    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
-    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
-
-    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
-    arrayMap(c -> (
-        ((c % 128) * 8 + 4)::Float64 AS cx,
-        ((c DIV 128) * 8 + 4)::Float64 AS cy,
-        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
-          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
-         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
-    ).3, range(128 * 128)) AS grid
-
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) FROM (
+        SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
+              + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+              sumIf(temperature, isNotNull(temperature)) AS s,
+              countIf(isNotNull(temperature)) AS c
+        FROM {table:Identifier}
+        WHERE in_tile
+        GROUP BY cell
+    ) ) AS grid0,
+    ( SELECT arrayMap(t -> t.1, grid0) ) AS sum0,
+    ( SELECT arrayMap(t -> t.2, grid0) ) AS cnt0,
+    ( SELECT arrayMap(i -> sum0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS sum1,
+    ( SELECT arrayMap(i -> cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS cnt1,
+    ( SELECT arrayMap(i -> sum1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS sum2,
+    ( SELECT arrayMap(i -> cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS cnt2,
+    ( SELECT arrayMap(i -> sum2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS sum3,
+    ( SELECT arrayMap(i -> cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS cnt3,
+    ( SELECT arrayMap(i -> sum3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS sum4,
+    ( SELECT arrayMap(i -> cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS cnt4,
+    ( SELECT arrayMap(i -> sum4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS sum5,
+    ( SELECT arrayMap(i -> cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS cnt5,
+    ( SELECT arrayMap(i -> sum5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS sum6,
+    ( SELECT arrayMap(i -> cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS cnt6,
+    ( SELECT arrayMap(i -> sum6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS sum7,
+    ( SELECT arrayMap(i -> cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS cnt7,
+    1 AS _dummy
 SELECT
-    round(255 * m)::UInt8 AS red,
-    round(255 * (1 - abs(m - 0.5) * 2))::UInt8 AS green,
-    round(255 * (1 - m))::UInt8 AS blue,
-    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+    round(255*m)::UInt8 AS red, round(255*(1-abs(m-0.5)*2))::UInt8 AS green, round(255*(1-m))::UInt8 AS blue,
+    if(isNull(v), 0, 255)::UInt8 AS alpha
 FROM (
-    SELECT
-        (number % 1024) AS x, (number DIV 1024) AS y,
-        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
-        cell.1 AS val, cell.2 AS d,
-        greatest(0, least(1, (val + 30) / 70)) AS m
+    SELECT (number % 1024) AS px, (number DIV 1024) AS py,
+        if(cnt0[(py DIV 8) * 128 + (px DIV 8) + 1] > 0, sum0[(py DIV 8) * 128 + (px DIV 8) + 1] / cnt0[(py DIV 8) * 128 + (px DIV 8) + 1], if(cnt1[(py DIV 16) * 64 + (px DIV 16) + 1] > 0, sum1[(py DIV 16) * 64 + (px DIV 16) + 1] / cnt1[(py DIV 16) * 64 + (px DIV 16) + 1], if(cnt2[(py DIV 32) * 32 + (px DIV 32) + 1] > 0, sum2[(py DIV 32) * 32 + (px DIV 32) + 1] / cnt2[(py DIV 32) * 32 + (px DIV 32) + 1], if(cnt3[(py DIV 64) * 16 + (px DIV 64) + 1] > 0, sum3[(py DIV 64) * 16 + (px DIV 64) + 1] / cnt3[(py DIV 64) * 16 + (px DIV 64) + 1], if(cnt4[(py DIV 128) * 8 + (px DIV 128) + 1] > 0, sum4[(py DIV 128) * 8 + (px DIV 128) + 1] / cnt4[(py DIV 128) * 8 + (px DIV 128) + 1], if(cnt5[(py DIV 256) * 4 + (px DIV 256) + 1] > 0, sum5[(py DIV 256) * 4 + (px DIV 256) + 1] / cnt5[(py DIV 256) * 4 + (px DIV 256) + 1], if(cnt6[(py DIV 512) * 2 + (px DIV 512) + 1] > 0, sum6[(py DIV 512) * 2 + (px DIV 512) + 1] / cnt6[(py DIV 512) * 2 + (px DIV 512) + 1], if(cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1] > 0, sum7[(py DIV 1024) * 1 + (px DIV 1024) + 1] / cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1], NULL)))))))) AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m
     FROM numbers(1024 * 1024)
 )`,
 "Wind": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size / 1024.0 AS px_scale,
-
-    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
-    (
-        SELECT groupArray((sx, sy, val))
-        FROM (
-            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
-                   (mercator_y - tile_y_begin) / px_scale AS sy,
-                   wind_speed AS val
-            FROM {table:Identifier}
-            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
-              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size AND wind_speed > 0
-            ORDER BY cityHash64(station) LIMIT 250
-        )
-    ) AS stations,
-
-    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
-    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
-
-    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
-    arrayMap(c -> (
-        ((c % 128) * 8 + 4)::Float64 AS cx,
-        ((c DIV 128) * 8 + 4)::Float64 AS cy,
-        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
-          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
-         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
-    ).3, range(128 * 128)) AS grid
-
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) FROM (
+        SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
+              + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+              sumIf(wind_speed, isNotNull(wind_speed)) AS s,
+              countIf(isNotNull(wind_speed)) AS c
+        FROM {table:Identifier}
+        WHERE in_tile
+        GROUP BY cell
+    ) ) AS grid0,
+    ( SELECT arrayMap(t -> t.1, grid0) ) AS sum0,
+    ( SELECT arrayMap(t -> t.2, grid0) ) AS cnt0,
+    ( SELECT arrayMap(i -> sum0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS sum1,
+    ( SELECT arrayMap(i -> cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS cnt1,
+    ( SELECT arrayMap(i -> sum1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS sum2,
+    ( SELECT arrayMap(i -> cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS cnt2,
+    ( SELECT arrayMap(i -> sum2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS sum3,
+    ( SELECT arrayMap(i -> cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS cnt3,
+    ( SELECT arrayMap(i -> sum3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS sum4,
+    ( SELECT arrayMap(i -> cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS cnt4,
+    ( SELECT arrayMap(i -> sum4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS sum5,
+    ( SELECT arrayMap(i -> cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS cnt5,
+    ( SELECT arrayMap(i -> sum5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS sum6,
+    ( SELECT arrayMap(i -> cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS cnt6,
+    ( SELECT arrayMap(i -> sum6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS sum7,
+    ( SELECT arrayMap(i -> cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS cnt7,
+    1 AS _dummy
 SELECT
-    round(255 * m)::UInt8 AS red,
-    round(120 * (1 - m))::UInt8 AS green,
-    round(255 * (1 - m))::UInt8 AS blue,
-    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+    round(255*m)::UInt8 AS red, round(120*(1-m))::UInt8 AS green, round(255*(1-m))::UInt8 AS blue,
+    if(isNull(v), 0, 255)::UInt8 AS alpha
 FROM (
-    SELECT
-        (number % 1024) AS x, (number DIV 1024) AS y,
-        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
-        cell.1 AS val, cell.2 AS d,
-        least(1, val / 15) AS m
+    SELECT (number % 1024) AS px, (number DIV 1024) AS py,
+        if(cnt0[(py DIV 8) * 128 + (px DIV 8) + 1] > 0, sum0[(py DIV 8) * 128 + (px DIV 8) + 1] / cnt0[(py DIV 8) * 128 + (px DIV 8) + 1], if(cnt1[(py DIV 16) * 64 + (px DIV 16) + 1] > 0, sum1[(py DIV 16) * 64 + (px DIV 16) + 1] / cnt1[(py DIV 16) * 64 + (px DIV 16) + 1], if(cnt2[(py DIV 32) * 32 + (px DIV 32) + 1] > 0, sum2[(py DIV 32) * 32 + (px DIV 32) + 1] / cnt2[(py DIV 32) * 32 + (px DIV 32) + 1], if(cnt3[(py DIV 64) * 16 + (px DIV 64) + 1] > 0, sum3[(py DIV 64) * 16 + (px DIV 64) + 1] / cnt3[(py DIV 64) * 16 + (px DIV 64) + 1], if(cnt4[(py DIV 128) * 8 + (px DIV 128) + 1] > 0, sum4[(py DIV 128) * 8 + (px DIV 128) + 1] / cnt4[(py DIV 128) * 8 + (px DIV 128) + 1], if(cnt5[(py DIV 256) * 4 + (px DIV 256) + 1] > 0, sum5[(py DIV 256) * 4 + (px DIV 256) + 1] / cnt5[(py DIV 256) * 4 + (px DIV 256) + 1], if(cnt6[(py DIV 512) * 2 + (px DIV 512) + 1] > 0, sum6[(py DIV 512) * 2 + (px DIV 512) + 1] / cnt6[(py DIV 512) * 2 + (px DIV 512) + 1], if(cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1] > 0, sum7[(py DIV 1024) * 1 + (px DIV 1024) + 1] / cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1], NULL)))))))) AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m
     FROM numbers(1024 * 1024)
 )`,
 "Pressure": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin,
+    tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin,
-    tile_size / 1024.0 AS px_scale,
-
-    /* Gather a sparse spatial sample of stations in the tile + one-tile margin. */
-    (
-        SELECT groupArray((sx, sy, val))
-        FROM (
-            SELECT (mercator_x - tile_x_begin) / px_scale AS sx,
-                   (mercator_y - tile_y_begin) / px_scale AS sy,
-                   pressure AS val
-            FROM {table:Identifier}
-            WHERE mercator_x >= tile_x_begin - tile_size AND mercator_x < tile_x_begin + 2 * tile_size
-              AND mercator_y >= tile_y_begin - tile_size AND mercator_y < tile_y_begin + 2 * tile_size AND pressure > 100
-            ORDER BY cityHash64(station) LIMIT 250
-        )
-    ) AS stations,
-
-    /* Kernel width ~ (2x inter-station spacing)^2, so the field is smooth at any zoom. */
-    greatest(64.0, 40000000.0 / greatest(1, length(stations))) AS eps,
-
-    /* One coarse 128x128 pass: Gaussian-kernel smoothed value + nearest-station distance. */
-    arrayMap(c -> (
-        ((c % 128) * 8 + 4)::Float64 AS cx,
-        ((c DIV 128) * 8 + 4)::Float64 AS cy,
-        (arraySum(s -> s.3 * exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations)
-          / arraySum(s -> exp(-((cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2)) / (2 * eps)), stations),
-         arrayMin(s -> (cx - s.1) * (cx - s.1) + (cy - s.2) * (cy - s.2), stations))
-    ).3, range(128 * 128)) AS grid
-
+    tile_size * ({y:UInt32} + 1) AS tile_y_end,
+    mercator_x >= tile_x_begin AND mercator_x < tile_x_end
+    AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
+    ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) FROM (
+        SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
+              + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+              sumIf(pressure, isNotNull(pressure)) AS s,
+              countIf(isNotNull(pressure)) AS c
+        FROM {table:Identifier}
+        WHERE in_tile
+        GROUP BY cell
+    ) ) AS grid0,
+    ( SELECT arrayMap(t -> t.1, grid0) ) AS sum0,
+    ( SELECT arrayMap(t -> t.2, grid0) ) AS cnt0,
+    ( SELECT arrayMap(i -> sum0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + sum0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS sum1,
+    ( SELECT arrayMap(i -> cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)  )*128 + 2*(i%64)+1 + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)   + 1] + cnt0[(2*(i DIV 64)+1)*128 + 2*(i%64)+1 + 1], range(4096)) ) AS cnt1,
+    ( SELECT arrayMap(i -> sum1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + sum1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS sum2,
+    ( SELECT arrayMap(i -> cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)  )*64 + 2*(i%32)+1 + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)   + 1] + cnt1[(2*(i DIV 32)+1)*64 + 2*(i%32)+1 + 1], range(1024)) ) AS cnt2,
+    ( SELECT arrayMap(i -> sum2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + sum2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS sum3,
+    ( SELECT arrayMap(i -> cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)  )*32 + 2*(i%16)+1 + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)   + 1] + cnt2[(2*(i DIV 16)+1)*32 + 2*(i%16)+1 + 1], range(256)) ) AS cnt3,
+    ( SELECT arrayMap(i -> sum3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + sum3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS sum4,
+    ( SELECT arrayMap(i -> cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)  )*16 + 2*(i%8)+1 + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)   + 1] + cnt3[(2*(i DIV 8)+1)*16 + 2*(i%8)+1 + 1], range(64)) ) AS cnt4,
+    ( SELECT arrayMap(i -> sum4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + sum4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS sum5,
+    ( SELECT arrayMap(i -> cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)  )*8 + 2*(i%4)+1 + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)   + 1] + cnt4[(2*(i DIV 4)+1)*8 + 2*(i%4)+1 + 1], range(16)) ) AS cnt5,
+    ( SELECT arrayMap(i -> sum5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + sum5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS sum6,
+    ( SELECT arrayMap(i -> cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)  )*4 + 2*(i%2)+1 + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)   + 1] + cnt5[(2*(i DIV 2)+1)*4 + 2*(i%2)+1 + 1], range(4)) ) AS cnt6,
+    ( SELECT arrayMap(i -> sum6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + sum6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS sum7,
+    ( SELECT arrayMap(i -> cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)  )*2 + 2*(i%1)+1 + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)   + 1] + cnt6[(2*(i DIV 1)+1)*2 + 2*(i%1)+1 + 1], range(1)) ) AS cnt7,
+    1 AS _dummy
 SELECT
-    round(255 * m)::UInt8 AS red,
-    round(80 + 60 * (1 - abs(m - 0.5) * 2))::UInt8 AS green,
-    round(255 * (1 - m))::UInt8 AS blue,
-    round(255 * least(1.0, exp((sqrt(eps) - sqrt(d)) / (0.5 * sqrt(eps)))))::UInt8 AS alpha
+    round(255*m)::UInt8 AS red, round(80+60*(1-abs(m-0.5)*2))::UInt8 AS green, round(255*(1-m))::UInt8 AS blue,
+    if(isNull(v), 0, 255)::UInt8 AS alpha
 FROM (
-    SELECT
-        (number % 1024) AS x, (number DIV 1024) AS y,
-        grid[(y DIV 8) * 128 + (x DIV 8) + 1] AS cell,
-        cell.1 AS val, cell.2 AS d,
-        greatest(0, least(1, (val - 985) / 55)) AS m
+    SELECT (number % 1024) AS px, (number DIV 1024) AS py,
+        if(cnt0[(py DIV 8) * 128 + (px DIV 8) + 1] > 0, sum0[(py DIV 8) * 128 + (px DIV 8) + 1] / cnt0[(py DIV 8) * 128 + (px DIV 8) + 1], if(cnt1[(py DIV 16) * 64 + (px DIV 16) + 1] > 0, sum1[(py DIV 16) * 64 + (px DIV 16) + 1] / cnt1[(py DIV 16) * 64 + (px DIV 16) + 1], if(cnt2[(py DIV 32) * 32 + (px DIV 32) + 1] > 0, sum2[(py DIV 32) * 32 + (px DIV 32) + 1] / cnt2[(py DIV 32) * 32 + (px DIV 32) + 1], if(cnt3[(py DIV 64) * 16 + (px DIV 64) + 1] > 0, sum3[(py DIV 64) * 16 + (px DIV 64) + 1] / cnt3[(py DIV 64) * 16 + (px DIV 64) + 1], if(cnt4[(py DIV 128) * 8 + (px DIV 128) + 1] > 0, sum4[(py DIV 128) * 8 + (px DIV 128) + 1] / cnt4[(py DIV 128) * 8 + (px DIV 128) + 1], if(cnt5[(py DIV 256) * 4 + (px DIV 256) + 1] > 0, sum5[(py DIV 256) * 4 + (px DIV 256) + 1] / cnt5[(py DIV 256) * 4 + (px DIV 256) + 1], if(cnt6[(py DIV 512) * 2 + (px DIV 512) + 1] > 0, sum6[(py DIV 512) * 2 + (px DIV 512) + 1] / cnt6[(py DIV 512) * 2 + (px DIV 512) + 1], if(cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1] > 0, sum7[(py DIV 1024) * 1 + (px DIV 1024) + 1] / cnt7[(py DIV 1024) * 1 + (px DIV 1024) + 1], NULL)))))))) AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m
     FROM numbers(1024 * 1024)
 )`
         }
