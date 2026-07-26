@@ -3290,8 +3290,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             },
         ],
         levels: [
-            { table: 'isd_mercator_sample10', sample: 10, priority: 1 },
-            { table: 'isd_mercator',          sample: 1,  priority: 2 },
+            { table: 'isd_mercator', sample: 1, priority: 1 },
         ],
         time: { column: 'timestamp' },
         report_total: {
@@ -3798,7 +3797,7 @@ ORDER BY n`,
     ( SELECT groupArrayInsertAt((CAST(NULL AS Nullable(Float64)), toUInt8(9))::Tuple(Nullable(Float64), UInt8), 65536)(
             if(g0[i+1].2 > 0, (toNullable(g0[i+1].1 / g0[i+1].2), toUInt8(0)), L1[((i DIV 256) DIV 2) * 128 + ((i % 256) DIV 2) + 1]), i)
         FROM ( SELECT number::UInt32 AS i FROM numbers(65536) ) ) AS L0,
-    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 50) AS m, if(isNull(v), 0, toUInt32(round(150+105*m)) + bitShiftLeft(toUInt32(round(180+75*m)), 8) + bitShiftLeft(toUInt32(round(220+35*m)), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21,15][t.2 + 1]), 24)) ).4, i)
+    ( SELECT groupArrayInsertAt(0::UInt32, 65536)(( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 50) AS m, if(isNull(v), 0, toUInt32(round(205-55*m)) + bitShiftLeft(toUInt32(round(224-24*m)), 8) + bitShiftLeft(toUInt32(round(246-6*m)), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21,15][t.2 + 1]), 24)) ).4, i)
         FROM ( SELECT number::UInt32 AS i, L0[number + 1] AS t FROM numbers(65536) ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,

@@ -4,14 +4,15 @@
 # (https://registry.opendata.aws/noaa-global-hourly/) into isd_mercator. Server-side read.
 # The tables must exist already: clickhouse-client < isd-setup.sql
 #
-# Default range is 2000..current (the era of dense global coverage, ~3B rows). Override with
+# Default range is the full ISD record 1901..current (~3.8B rows; coverage is a handful of
+# stations in 1901, ~48M/yr by 1999, ~130M/yr now). Override with
 #   FROM_YEAR=1973 TO_YEAR=2026 ./prepare-isd.sh
 #
 # Everything is read as String (so no row fails to parse) and each ISD code field is decoded
 # into its typed column; missing-value sentinels (9999/99999/999999) become NULL. Only rows
 # whose coordinates cannot be parsed are dropped, to keep as much of the source as possible.
 
-FROM_YEAR="${FROM_YEAR:-2000}"
+FROM_YEAR="${FROM_YEAR:-1901}"
 TO_YEAR="${TO_YEAR:-2026}"
 
 SCHEMA='STATION String, DATE String, SOURCE String, LATITUDE String, LONGITUDE String, ELEVATION String, NAME String, REPORT_TYPE String, CALL_SIGN String, QUALITY_CONTROL String, WND String, CIG String, VIS String, TMP String, DEW String, SLP String, AA1 String, AA2 String, AA3 String, AJ1 String, AY1 String, AY2 String, GA1 String, GA2 String, GA3 String, GE1 String, GF1 String, IA1 String, KA1 String, KA2 String, MA1 String, MD1 String, MW1 String, OC1 String, OD1 String, SA1 String, UA1 String, REM String, EQD String'
@@ -26,7 +27,11 @@ INSERT INTO isd_mercator
  visibility, ceiling, cloud_cover, cloud_base, precipitation, snow_depth, sea_surface_temp,
  present_weather, pressure_tendency)
 SELECT
-    parseDateTimeBestEffortOrZero(DATE) AS timestamp,
+    -- DateTime64 via a Date32 date-part (valid back to 1901; the best-effort/DateTime parsers
+    -- clamp anything before 1970 to the epoch) plus the parsed time-of-day in seconds.
+    toDateTime64(ifNull(toDate32OrNull(substring(DATE, 1, 10)), toDate32('1970-01-01')), 0)
+      + (toInt32OrZero(substring(DATE, 12, 2)) * 3600 + toInt32OrZero(substring(DATE, 15, 2)) * 60
+         + toInt32OrZero(substring(DATE, 18, 2))) AS timestamp,
     toFloat64OrZero(LATITUDE) AS lat,
     toFloat64OrZero(LONGITUDE) AS lon,
     STATION AS station,

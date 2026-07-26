@@ -17,7 +17,7 @@ CREATE TABLE isd_mercator
     INDEX idx_x (mercator_x) TYPE minmax,
     INDEX idx_y (mercator_y) TYPE minmax,
 
-    timestamp DateTime,
+    timestamp DateTime64(0),   -- DateTime64 (not DateTime) so pre-1970 records reach back to 1901
     lat Float64,
     lon Float64,
     station String,
@@ -45,8 +45,8 @@ CREATE TABLE isd_mercator
     pressure_tendency Nullable(Float32)   -- hPa / 3h, signed (MD1)
 ) ENGINE = MergeTree ORDER BY (mortonEncode(mercator_x, mercator_y), timestamp);
 
-CREATE TABLE isd_mercator_sample10 AS isd_mercator;
-CREATE MATERIALIZED VIEW isd_view_sample10 TO isd_mercator_sample10 AS SELECT * FROM isd_mercator WHERE rand() % 10 = 0;
+-- No sample table: the pyramid tile query and the daily histogram both run in well under a
+-- second on the full table (morton/minmax pruning), so a sampled companion is not needed.
 
 -- Per-station climatology (kept for convenience; not required by the current maps).
 CREATE TABLE isd_stations
@@ -68,5 +68,4 @@ CREATE TABLE isd_stations
 ) ENGINE = MergeTree ORDER BY mortonEncode(mercator_x, mercator_y);
 
 GRANT SELECT ON default.isd_mercator TO website;
-GRANT SELECT ON default.isd_mercator_sample10 TO website;
 GRANT SELECT ON default.isd_stations TO website;
