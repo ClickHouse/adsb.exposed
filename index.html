@@ -1102,6 +1102,39 @@
             return query.replace(/(WHERE\s+.+?)\s*(GROUP\s+BY)/is, '$1 ' + patch + '\n$2');
         }
 
+        /// The example a query came from: an exact match if there is one, otherwise the example
+        /// whose WHERE clause this query only extends — that extension is the active filter, and
+        /// knowing the example is what makes the filter removable. A shared link carries the SQL
+        /// and not the example name, and a query that has a filter on top of it (or was edited,
+        /// or was saved before the example itself changed) never matches verbatim, so among the
+        /// candidates pick the one sharing the longest prefix with it.
+        function findExampleForQuery(query) {
+            let best = null;
+            let best_prefix = -1;
+            for (const name of Object.keys(queries)) {
+                if (query == queries[name]) return name;
+                if (!getWherePatch(query, queries[name])) continue;
+                let prefix = 0;
+                while (prefix < query.length && query[prefix] == queries[name][prefix]) ++prefix;
+                if (prefix > best_prefix) {
+                    best = name;
+                    best_prefix = prefix;
+                }
+            }
+            return best;
+        }
+
+        /// Set up the examples row for a query that was not chosen by clicking an example: one
+        /// restored from a link or from the history. Only an exact match highlights an example;
+        /// a query with a filter on top of it is still attributed to it (so that the filter can
+        /// be dropped), but the example is not shown as selected.
+        function selectExampleForQuery(query) {
+            last_selected_example = findExampleForQuery(query);
+            for (const example of examples_elem.querySelectorAll('span')) {
+                example.classList.toggle('selected', query == queries[example.textContent]);
+            }
+        }
+
         /// The conditions narrowing the example's own WHERE clause: either added by clicking
         /// an item in the report (which marks them with a `/* Filter: */` comment), or typed
         /// by hand. The marker is checked first, because it survives sharing a link, while
@@ -2060,17 +2093,11 @@
             if (hash) {
                 loadQuery(hash).then(query => {
                     query_elem.value = query;
+                    /// Before updateMap, which displays the active filter and for that needs to
+                    /// know which example the query was filtered from.
+                    selectExampleForQuery(query);
                     map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
                     updateMap();
-
-                    last_selected_example = null;
-                    for (example of examples_elem.querySelectorAll('span')) {
-                        example.classList.remove('selected');
-                        if (query == queries[example.innerText]) {
-                            example.classList.add('selected');
-                            last_selected_example = example.innerText;
-                        }
-                    }
                 });
             } else {
                 map.setView({lat: params.get('lat'), lng: params.get('lng')}, params.get('zoom'));
@@ -2727,6 +2754,7 @@
                 switchDataset(state.dataset);
             }
             query_elem.value = state.query;
+            selectExampleForQuery(state.query);
             time_window = state.time || null;
             time_reset_elem.style.display = time_window ? 'block' : 'none';
             setBasemapVisible(!!state.basemap);
