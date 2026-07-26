@@ -3296,50 +3296,53 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT toInt32(toDate32(timestamp)) AS day, count() AS obs,
-                    round(minIf(temperature, temperature BETWEEN -95 AND 65), 1) AS lo_temperature, round(maxIf(temperature, temperature BETWEEN -95 AND 65), 1) AS hi_temperature,
-                    round(minIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS lo_dew_point, round(maxIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS hi_dew_point,
-                    round(minIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS lo_relative_humidity, round(maxIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS hi_relative_humidity,
-                    round(minIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS lo_wet_bulb, round(maxIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS hi_wet_bulb,
-                    round(minIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS lo_wind_speed, round(maxIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS hi_wind_speed,
-                    round(minIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS lo_wind_gust, round(maxIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS hi_wind_gust,
-                    round(minIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS lo_wind_direction, round(maxIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS hi_wind_direction,
-                    round(minIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS lo_pressure, round(maxIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS hi_pressure,
-                    round(minIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS lo_station_pressure, round(maxIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS hi_station_pressure,
-                    round(minIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS lo_pressure_tendency, round(maxIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS hi_pressure_tendency,
-                    round(minIf(visibility, visibility BETWEEN 0 AND 100), 1) AS lo_visibility, round(maxIf(visibility, visibility BETWEEN 0 AND 100), 1) AS hi_visibility,
-                    round(minIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS lo_ceiling, round(maxIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS hi_ceiling,
-                    round(minIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS lo_cloud_cover, round(maxIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS hi_cloud_cover,
-                    round(minIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS lo_precipitation, round(maxIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS hi_precipitation,
-                    round(minIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS lo_snow_depth, round(maxIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS hi_snow_depth
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile,
+                    (SELECT max(toInt32(toDate32(timestamp))) - min(toInt32(toDate32(timestamp))) FROM {table:Identifier} WHERE ${condition}) AS span,
+                    multiIf(span <= 400, 1, span <= 2800, 7, span <= 12000, 30, span <= 36000, 91, 365) AS bsize,
+                    intDiv(toInt32(toDate32(timestamp)), bsize) * bsize AS bucket
+                SELECT bucket AS day, count() AS obs,
+                    round(minIf(temperature, temperature BETWEEN -95 AND 65), 1) AS lo_temperature, round(maxIf(temperature, temperature BETWEEN -95 AND 65), 1) AS hi_temperature, round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS avg_temperature,
+                    round(minIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS lo_dew_point, round(maxIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS hi_dew_point, round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS avg_dew_point,
+                    round(minIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS lo_relative_humidity, round(maxIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS hi_relative_humidity, round(avgIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS avg_relative_humidity,
+                    round(minIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS lo_wet_bulb, round(maxIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS hi_wet_bulb, round(avgIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS avg_wet_bulb,
+                    round(minIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS lo_wind_speed, round(maxIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS hi_wind_speed, round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS avg_wind_speed,
+                    round(minIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS lo_wind_gust, round(maxIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS hi_wind_gust, round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS avg_wind_gust,
+                    round(minIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS lo_wind_direction, round(maxIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS hi_wind_direction, round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS avg_wind_direction,
+                    round(minIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS lo_pressure, round(maxIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS hi_pressure, round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS avg_pressure,
+                    round(minIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS lo_station_pressure, round(maxIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS hi_station_pressure, round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS avg_station_pressure,
+                    round(minIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS lo_pressure_tendency, round(maxIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS hi_pressure_tendency, round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS avg_pressure_tendency,
+                    round(minIf(visibility, visibility BETWEEN 0 AND 100), 1) AS lo_visibility, round(maxIf(visibility, visibility BETWEEN 0 AND 100), 1) AS hi_visibility, round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS avg_visibility,
+                    round(minIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS lo_ceiling, round(maxIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS hi_ceiling, round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS avg_ceiling,
+                    round(minIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS lo_cloud_cover, round(maxIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS hi_cloud_cover, round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS avg_cloud_cover,
+                    round(minIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS lo_precipitation, round(maxIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS hi_precipitation, round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS avg_precipitation,
+                    round(minIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS lo_snow_depth, round(maxIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS hi_snow_depth, round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS avg_snow_depth
                 FROM {table:Identifier} WHERE ${condition}
-                GROUP BY day ORDER BY day`),
+                GROUP BY bucket ORDER BY bucket`),
             html: (json => {
-                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_relative_humidity", "hi": "hi_relative_humidity", "l": "Humidity", "u": "%", "col": "#1f9ec4", "d": 0}, {"lo": "lo_wet_bulb", "hi": "hi_wet_bulb", "l": "Wet bulb", "u": "°C", "col": "#7a5ad0", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}];
+                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_relative_humidity", "hi": "hi_relative_humidity", "avg": "avg_relative_humidity", "l": "Humidity", "u": "%", "col": "#1f9ec4", "d": 0}, {"lo": "lo_wet_bulb", "hi": "hi_wet_bulb", "avg": "avg_wet_bulb", "l": "Wet bulb", "u": "°C", "col": "#7a5ad0", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}];
                 const rows = json.data || [];
                 if (!rows.length) return 'No data in the selected area.';
                 let obs = 0, dmin = Infinity, dmax = -Infinity;
                 for (const r of rows) { obs += Number(r.obs) || 0; const d = +r.day; if (d < dmin) dmin = d; if (d > dmax) dmax = d; }
-                const span = (dmax - dmin) || 1, W = 360, H = 24;
+                const span = (dmax - dmin) || 1, W = 400, H = 26;
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
-                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · daily min/max, ${fmt(dmin)} → ${fmt(dmax)}</div>`;
+                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
+                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} min/avg/max · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
                 for (const m of M) {
-                    // Bucket days into pixel columns (min-of-daily-min, max-of-daily-max per column)
-                    // so the envelope stays cheap even over ~46k days of full history.
-                    let lo = Infinity, hi = -Infinity; const col = new Map();
+                    let lo = Infinity, hi = -Infinity; const pts = [];
                     for (const r of rows) { const a = r[m.lo], b = r[m.hi]; if (a == null || b == null) continue;
                         const la = +a, hb = +b; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        const x = Math.round((+r.day - dmin) / span * W);
-                        const c = col.get(x); if (c) { if (la < c[0]) c[0] = la; if (hb > c[1]) c[1] = hb; } else col.set(x, [la, hb]); }
-                    if (col.size < 2) continue;
-                    const xs = [...col.keys()].sort((a,b) => a - b);
+                        pts.push([((+r.day - dmin)/span*W), la, hb, r[m.avg] == null ? null : +r[m.avg]]); }
+                    if (pts.length < 2) continue;
                     const rng = (hi - lo) || 1, Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // filled envelope: max edge forward, min edge back
-                    const poly = xs.map(x => x+','+Y(col.get(x)[1])).concat(xs.slice().reverse().map(x => x+','+Y(col.get(x)[0]))).join(' ');
+                    // faint min–max fill (max edge forward, min edge back) + bright 1px avg line
+                    const band = pts.map(p => p[0].toFixed(1)+','+Y(p[2])).concat(pts.slice().reverse().map(p => p[0].toFixed(1)+','+Y(p[1]))).join(' ');
+                    const line = pts.filter(p => p[3] != null).map(p => p[0].toFixed(1)+','+Y(p[3])).join(' ');
                     out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
-                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px"><polygon points="${poly}" fill="${m.col}" fill-opacity="0.55" stroke="none"/></svg>`
+                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
+                        + `<polygon points="${band}" fill="${m.col}" fill-opacity="0.22" stroke="none"/>`
+                        + `<polyline points="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
                         + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
                 }
                 return out;
@@ -3932,50 +3935,53 @@ ORDER BY n`
         report_total: {
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
-                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT toInt32(toDate32(timestamp)) AS day, count() AS obs,
-                    round(minIf(temperature, temperature BETWEEN -95 AND 65), 1) AS lo_temperature, round(maxIf(temperature, temperature BETWEEN -95 AND 65), 1) AS hi_temperature,
-                    round(minIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS lo_dew_point, round(maxIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS hi_dew_point,
-                    round(minIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS lo_wind_speed, round(maxIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS hi_wind_speed,
-                    round(minIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS lo_wind_gust, round(maxIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS hi_wind_gust,
-                    round(minIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS lo_wind_direction, round(maxIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS hi_wind_direction,
-                    round(minIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS lo_pressure, round(maxIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS hi_pressure,
-                    round(minIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS lo_station_pressure, round(maxIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS hi_station_pressure,
-                    round(minIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS lo_pressure_tendency, round(maxIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS hi_pressure_tendency,
-                    round(minIf(visibility, visibility BETWEEN 0 AND 100), 1) AS lo_visibility, round(maxIf(visibility, visibility BETWEEN 0 AND 100), 1) AS hi_visibility,
-                    round(minIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS lo_ceiling, round(maxIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS hi_ceiling,
-                    round(minIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS lo_cloud_cover, round(maxIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS hi_cloud_cover,
-                    round(minIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS lo_precipitation, round(maxIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS hi_precipitation,
-                    round(minIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS lo_snow_depth, round(maxIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS hi_snow_depth,
-                    round(minIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS lo_sea_surface_temp, round(maxIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS hi_sea_surface_temp,
-                    round(minIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS lo_cloud_base, round(maxIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS hi_cloud_base
+                    AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile,
+                    (SELECT max(toInt32(toDate32(timestamp))) - min(toInt32(toDate32(timestamp))) FROM {table:Identifier} WHERE ${condition}) AS span,
+                    multiIf(span <= 400, 1, span <= 2800, 7, span <= 12000, 30, span <= 36000, 91, 365) AS bsize,
+                    intDiv(toInt32(toDate32(timestamp)), bsize) * bsize AS bucket
+                SELECT bucket AS day, count() AS obs,
+                    round(minIf(temperature, temperature BETWEEN -95 AND 65), 1) AS lo_temperature, round(maxIf(temperature, temperature BETWEEN -95 AND 65), 1) AS hi_temperature, round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS avg_temperature,
+                    round(minIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS lo_dew_point, round(maxIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS hi_dew_point, round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS avg_dew_point,
+                    round(minIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS lo_wind_speed, round(maxIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS hi_wind_speed, round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS avg_wind_speed,
+                    round(minIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS lo_wind_gust, round(maxIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS hi_wind_gust, round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS avg_wind_gust,
+                    round(minIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS lo_wind_direction, round(maxIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS hi_wind_direction, round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS avg_wind_direction,
+                    round(minIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS lo_pressure, round(maxIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS hi_pressure, round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS avg_pressure,
+                    round(minIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS lo_station_pressure, round(maxIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS hi_station_pressure, round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS avg_station_pressure,
+                    round(minIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS lo_pressure_tendency, round(maxIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS hi_pressure_tendency, round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS avg_pressure_tendency,
+                    round(minIf(visibility, visibility BETWEEN 0 AND 100), 1) AS lo_visibility, round(maxIf(visibility, visibility BETWEEN 0 AND 100), 1) AS hi_visibility, round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS avg_visibility,
+                    round(minIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS lo_ceiling, round(maxIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS hi_ceiling, round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS avg_ceiling,
+                    round(minIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS lo_cloud_cover, round(maxIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS hi_cloud_cover, round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS avg_cloud_cover,
+                    round(minIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS lo_precipitation, round(maxIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS hi_precipitation, round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS avg_precipitation,
+                    round(minIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS lo_snow_depth, round(maxIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS hi_snow_depth, round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS avg_snow_depth,
+                    round(minIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS lo_sea_surface_temp, round(maxIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS hi_sea_surface_temp, round(avgIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS avg_sea_surface_temp,
+                    round(minIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS lo_cloud_base, round(maxIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS hi_cloud_base, round(avgIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS avg_cloud_base
                 FROM {table:Identifier} WHERE ${condition}
-                GROUP BY day ORDER BY day`),
+                GROUP BY bucket ORDER BY bucket`),
             html: (json => {
-                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}, {"lo": "lo_sea_surface_temp", "hi": "hi_sea_surface_temp", "l": "Sea temp", "u": "°C", "col": "#1ba0b0", "d": 1}, {"lo": "lo_cloud_base", "hi": "hi_cloud_base", "l": "Cloud base", "u": "m", "col": "#93a2b0", "d": 0}];
+                const M = [{"lo": "lo_temperature", "hi": "hi_temperature", "avg": "avg_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"lo": "lo_dew_point", "hi": "hi_dew_point", "avg": "avg_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"lo": "lo_wind_speed", "hi": "hi_wind_speed", "avg": "avg_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"lo": "lo_wind_gust", "hi": "hi_wind_gust", "avg": "avg_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"lo": "lo_wind_direction", "hi": "hi_wind_direction", "avg": "avg_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"lo": "lo_pressure", "hi": "hi_pressure", "avg": "avg_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"lo": "lo_station_pressure", "hi": "hi_station_pressure", "avg": "avg_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"lo": "lo_pressure_tendency", "hi": "hi_pressure_tendency", "avg": "avg_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"lo": "lo_visibility", "hi": "hi_visibility", "avg": "avg_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"lo": "lo_ceiling", "hi": "hi_ceiling", "avg": "avg_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"lo": "lo_cloud_cover", "hi": "hi_cloud_cover", "avg": "avg_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"lo": "lo_precipitation", "hi": "hi_precipitation", "avg": "avg_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"lo": "lo_snow_depth", "hi": "hi_snow_depth", "avg": "avg_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}, {"lo": "lo_sea_surface_temp", "hi": "hi_sea_surface_temp", "avg": "avg_sea_surface_temp", "l": "Sea temp", "u": "°C", "col": "#1ba0b0", "d": 1}, {"lo": "lo_cloud_base", "hi": "hi_cloud_base", "avg": "avg_cloud_base", "l": "Cloud base", "u": "m", "col": "#93a2b0", "d": 0}];
                 const rows = json.data || [];
                 if (!rows.length) return 'No data in the selected area.';
                 let obs = 0, dmin = Infinity, dmax = -Infinity;
                 for (const r of rows) { obs += Number(r.obs) || 0; const d = +r.day; if (d < dmin) dmin = d; if (d > dmax) dmax = d; }
-                const span = (dmax - dmin) || 1, W = 360, H = 24;
+                const span = (dmax - dmin) || 1, W = 400, H = 26;
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
-                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · daily min/max, ${fmt(dmin)} → ${fmt(dmax)}</div>`;
+                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
+                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} min/avg/max · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
                 for (const m of M) {
-                    // Bucket days into pixel columns (min-of-daily-min, max-of-daily-max per column)
-                    // so the envelope stays cheap even over ~46k days of full history.
-                    let lo = Infinity, hi = -Infinity; const col = new Map();
+                    let lo = Infinity, hi = -Infinity; const pts = [];
                     for (const r of rows) { const a = r[m.lo], b = r[m.hi]; if (a == null || b == null) continue;
                         const la = +a, hb = +b; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        const x = Math.round((+r.day - dmin) / span * W);
-                        const c = col.get(x); if (c) { if (la < c[0]) c[0] = la; if (hb > c[1]) c[1] = hb; } else col.set(x, [la, hb]); }
-                    if (col.size < 2) continue;
-                    const xs = [...col.keys()].sort((a,b) => a - b);
+                        pts.push([((+r.day - dmin)/span*W), la, hb, r[m.avg] == null ? null : +r[m.avg]]); }
+                    if (pts.length < 2) continue;
                     const rng = (hi - lo) || 1, Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // filled envelope: max edge forward, min edge back
-                    const poly = xs.map(x => x+','+Y(col.get(x)[1])).concat(xs.slice().reverse().map(x => x+','+Y(col.get(x)[0]))).join(' ');
+                    // faint min–max fill (max edge forward, min edge back) + bright 1px avg line
+                    const band = pts.map(p => p[0].toFixed(1)+','+Y(p[2])).concat(pts.slice().reverse().map(p => p[0].toFixed(1)+','+Y(p[1]))).join(' ');
+                    const line = pts.filter(p => p[3] != null).map(p => p[0].toFixed(1)+','+Y(p[3])).join(' ');
                     out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
-                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px"><polygon points="${poly}" fill="${m.col}" fill-opacity="0.55" stroke="none"/></svg>`
+                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
+                        + `<polygon points="${band}" fill="${m.col}" fill-opacity="0.22" stroke="none"/>`
+                        + `<polyline points="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
                         + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
                 }
                 return out;
