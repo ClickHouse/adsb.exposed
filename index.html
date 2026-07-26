@@ -1734,6 +1734,35 @@
             return time_min_day + Math.round(frac * nDays - 0.5);
         }
 
+        /// How far from a window edge (css px) the pointer still grabs that edge's handle.
+        const TIME_HANDLE_GRAB = 12;
+        /// The central band that drags the window as a whole is never thinner than this, so a
+        /// narrow window (down to a single day) can still be moved and not only resized.
+        const TIME_MOVE_BAND = 14;
+
+        /// What a drag starting at `x` (css px within the canvas) would do:
+        /// 'from' | 'to' (resize that edge), 'move' (shift the window), 'new' (fresh selection).
+        function timeZoneAt(x, w) {
+            const winFrom = time_window ? time_window.from : time_min_day;
+            const winTo = time_window ? time_window.to : time_max_day;
+            const xL = dayToX(winFrom, w);
+            const xR = dayToX(winTo + 1, w);
+
+            /// The middle of the window wins over the handles: when the window is thin the
+            /// handles are still reachable from just outside it, while the middle would not be
+            /// reachable at all. For a wide window this is exactly the interior minus the
+            /// handle zones, as before.
+            if (time_window) {
+                const half = Math.max(TIME_MOVE_BAND / 2, (xR - xL) / 2 - TIME_HANDLE_GRAB);
+                if (Math.abs(x - (xL + xR) / 2) <= half) return 'move';
+            }
+
+            const dL = Math.abs(x - xL);
+            const dR = Math.abs(x - xR);
+            if (Math.min(dL, dR) <= TIME_HANDLE_GRAB) return dL <= dR ? 'from' : 'to';
+            return 'new';
+        }
+
         function drawHistogram() {
             const dpr = window.devicePixelRatio || 1;
             const cssW = time_canvas.clientWidth;
@@ -1857,30 +1886,24 @@
             if (time_min_day === null) return;
 
             const rect = time_canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const winFrom = time_window ? time_window.from : time_min_day;
-            const winTo = time_window ? time_window.to : time_max_day;
-            const xL = dayToX(winFrom, rect.width);
-            const xR = dayToX(winTo + 1, rect.width);
-            const dL = Math.abs(x - xL);
-            const dR = Math.abs(x - xR);
+            const zone = timeZoneAt(e.clientX - rect.left, rect.width);
 
-            if (Math.min(dL, dR) <= 12) {
-                /// Grab the nearer existing handle.
-                time_drag = dL <= dR ? 'from' : 'to';
-                time_canvas.style.cursor = 'ew-resize';
-            } else if (time_window && x > xL && x < xR) {
-                /// Inside the selected window (away from the handles): drag it as a whole.
+            if (zone === 'move') {
+                /// The middle of the selected window: drag it as a whole.
                 time_drag = 'move';
                 time_drag_anchor = xToDay(e.clientX);
                 time_drag_from0 = time_window.from;
                 time_drag_to0 = time_window.to;
                 time_canvas.style.cursor = 'grabbing';
-            } else {
+            } else if (zone === 'new') {
                 /// Start a fresh selection from the clicked point.
                 const day = Math.max(time_min_day, Math.min(time_max_day, xToDay(e.clientX)));
                 time_window = { from: day, to: day };
                 time_drag = 'to';
+                time_canvas.style.cursor = 'ew-resize';
+            } else {
+                /// Grab the nearer existing handle.
+                time_drag = zone;
                 time_canvas.style.cursor = 'ew-resize';
             }
 
@@ -1921,17 +1944,9 @@
 
             if (!time_drag) {
                 /// Not dragging: give the cursor a hint about what a drag here would do.
-                const winFrom = time_window ? time_window.from : time_min_day;
-                const winTo = time_window ? time_window.to : time_max_day;
-                const xL = dayToX(winFrom, rect.width);
-                const xR = dayToX(winTo + 1, rect.width);
-                if (Math.min(Math.abs(x - xL), Math.abs(x - xR)) <= 12) {
-                    time_canvas.style.cursor = 'ew-resize';
-                } else if (time_window && x > xL && x < xR) {
-                    time_canvas.style.cursor = 'grab';
-                } else {
-                    time_canvas.style.cursor = 'crosshair';
-                }
+                const zone = timeZoneAt(x, rect.width);
+                time_canvas.style.cursor =
+                    zone === 'move' ? 'grab' : zone === 'new' ? 'crosshair' : 'ew-resize';
                 drawHistogram();
                 return;
             }
