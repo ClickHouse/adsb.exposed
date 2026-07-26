@@ -7,6 +7,7 @@
 GRANT SELECT ON default.firms_mercator TO website;
 GRANT SELECT ON default.gbif_mercator TO website;
 GRANT SELECT ON default.gbif_mercator_sample10 TO website;
+GRANT SELECT ON default.ghcnh_mercator TO website;
 GRANT SELECT ON default.glm_mercator TO website;
 GRANT SELECT ON default.gtfs_mercator TO website;
 GRANT SELECT ON default.inat_mercator TO website;
