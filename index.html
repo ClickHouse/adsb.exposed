@@ -2404,7 +2404,11 @@
 
             calculateReport(config.report_total.query(condition), "total").then(json => {
                 if (!json || current_report_sequence_num != report_sequence_num) return;
-                document.getElementById('report_total').textContent = config.report_total.content(json);
+                const total = document.getElementById('report_total');
+                /// A report_total may render rich HTML (e.g. per-metric charts) via html();
+                /// otherwise it returns plain text via content().
+                if (config.report_total.html) total.innerHTML = config.report_total.html(json);
+                else total.textContent = config.report_total.content(json);
             });
 
             config.reports.forEach(report => {

@@ -3297,45 +3297,44 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT count() AS obs, uniq(station) AS stations,
-                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS temp,
-                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS dew,
-                    round(avgIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS rh,
-                    round(avgIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS wb,
-                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS wspd,
-                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS gust,
-                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS wdir,
-                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS slp,
-                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS statp,
-                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS tend,
-                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS vis,
-                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS ceil,
-                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS cloud,
-                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 3) AS precip,
-                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS snow,
-                    min(timestamp) AS first, max(timestamp) AS last
-                FROM {table:Identifier} WHERE ${condition}`),
-            content: (json => {
-                const r = json.data[0];
-                const p = [];
-                if (r.temp != null) p.push(`temp ${r.temp}°C`);
-                if (r.dew != null) p.push(`dew ${r.dew}°C`);
-                if (r.rh != null) p.push(`RH ${r.rh}%`);
-                if (r.wb != null) p.push(`wet-bulb ${r.wb}°C`);
-                if (r.wspd != null) p.push(`wind ${r.wspd} m/s` + (r.gust!=null?` (gust ${r.gust})`:'') + (r.wdir!=null?` @ ${r.wdir}°`:''));
-                if (r.slp != null) p.push(`SLP ${r.slp} hPa`);
-                if (r.statp != null) p.push(`station ${r.statp} hPa`);
-                if (r.tend != null) p.push(`tendency ${r.tend} hPa/3h`);
-                if (r.vis != null) p.push(`visibility ${r.vis} km`);
-                if (r.ceil != null) p.push(`ceiling ${r.ceil} m`);
-                if (r.cloud != null) p.push(`cloud ${r.cloud}%`);
-                if (r.precip != null) p.push(`precip ${r.precip} mm`);
-                if (r.snow != null) p.push(`snow ${r.snow} cm`);
-                let text = `${Number(r.obs).toLocaleString()} observations from ${Number(r.stations).toLocaleString()} stations.`;
-                if (p.length) text += ' Mean: ' + p.join(', ') + '.';
-                if (r.obs > 0) text += ` Time: ${r.first} — ${r.last}.`;
-                if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
-                return text;
+                SELECT toMonth(timestamp) AS mon, count() AS obs,
+                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS v_temperature,
+                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS v_dew_point,
+                    round(avgIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS v_relative_humidity,
+                    round(avgIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS v_wet_bulb,
+                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS v_wind_speed,
+                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS v_wind_gust,
+                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS v_wind_direction,
+                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS v_pressure,
+                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS v_station_pressure,
+                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS v_pressure_tendency,
+                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS v_visibility,
+                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS v_ceiling,
+                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS v_cloud_cover,
+                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS v_precipitation,
+                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS v_snow_depth
+                FROM {table:Identifier} WHERE ${condition}
+                GROUP BY mon ORDER BY mon`),
+            html: (json => {
+                const M = [{"c": "v_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"c": "v_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"c": "v_relative_humidity", "l": "Humidity", "u": "%", "col": "#1f9ec4", "d": 0}, {"c": "v_wet_bulb", "l": "Wet bulb", "u": "°C", "col": "#7a5ad0", "d": 1}, {"c": "v_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"c": "v_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"c": "v_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"c": "v_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"c": "v_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"c": "v_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"c": "v_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"c": "v_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"c": "v_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"c": "v_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"c": "v_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}];
+                const rows = json.data || [];
+                const by = {}; let obs = 0;
+                rows.forEach(r => { by[+r.mon] = r; obs += Number(r.obs) || 0; });
+                const mo = [1,2,3,4,5,6,7,8,9,10,11,12], W = 150, H = 26;
+                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · monthly climatology (Jan → Dec)</div>`;
+                for (const m of M) {
+                    const vals = mo.map(x => (by[x] && by[x][m.c] != null) ? Number(by[x][m.c]) : null);
+                    const pv = vals.filter(v => v != null);
+                    if (pv.length < 2) continue;
+                    const lo = Math.min(...pv), hi = Math.max(...pv), rng = (hi - lo) || 1;
+                    const pts = vals.map((v,i) => v == null ? null :
+                        ((i/11*W).toFixed(1) + ',' + (H-2 - (v-lo)/rng*(H-4)).toFixed(1))).filter(Boolean).join(' ');
+                    out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
+                        + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
+                        + `<svg width="${W}" height="${H}" style="flex:0 0 auto;overflow:visible"><polyline points="${pts}" fill="none" stroke="${m.col}" stroke-width="1.5"/></svg>`
+                        + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
+                }
+                return out || 'No data in the selected area.';
             }),
         },
         reports: [
@@ -3343,7 +3342,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 query: (condition => `
                     WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                         AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT name, round(avgIf(temperature, isNotNull(temperature)), 1) AS t, count() AS c
+                    SELECT name, round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS t, count() AS c
                     FROM {table:Identifier}
                     WHERE name != '' AND ${condition}
                     GROUP BY name ORDER BY c DESC LIMIT 100`),
@@ -3926,43 +3925,44 @@ ORDER BY n`
             query: (condition => `
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                SELECT count() AS obs, uniq(station) AS stations,
-                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS temp,
-                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS dew,
-                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS wspd,
-                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS gust,
-                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS wdir,
-                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS slp,
-                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS statp,
-                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS tend,
-                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS vis,
-                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS ceil,
-                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS cloud,
-                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 3) AS precip,
-                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS snow,
-                    round(avgIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS sst,
-                    min(timestamp) AS first, max(timestamp) AS last
-                FROM {table:Identifier} WHERE ${condition}`),
-            content: (json => {
-                const r = json.data[0];
-                const p = [];
-                if (r.temp != null) p.push(`temp ${r.temp}°C`);
-                if (r.dew != null) p.push(`dew ${r.dew}°C`);
-                if (r.wspd != null) p.push(`wind ${r.wspd} m/s` + (r.gust!=null?` (gust ${r.gust})`:'') + (r.wdir!=null?` @ ${r.wdir}°`:''));
-                if (r.slp != null) p.push(`SLP ${r.slp} hPa`);
-                if (r.statp != null) p.push(`station ${r.statp} hPa`);
-                if (r.tend != null) p.push(`tendency ${r.tend} hPa/3h`);
-                if (r.vis != null) p.push(`visibility ${r.vis} km`);
-                if (r.ceil != null) p.push(`ceiling ${r.ceil} m`);
-                if (r.cloud != null) p.push(`cloud ${r.cloud}%`);
-                if (r.precip != null) p.push(`precip ${r.precip} mm`);
-                if (r.snow != null) p.push(`snow ${r.snow} cm`);
-                if (r.sst != null) p.push(`sea ${r.sst}°C`);
-                let text = `${Number(r.obs).toLocaleString()} observations from ${Number(r.stations).toLocaleString()} stations.`;
-                if (p.length) text += ' Mean: ' + p.join(', ') + '.';
-                if (r.obs > 0) text += ` Time: ${r.first} — ${r.last}.`;
-                if (json.statistics.rows_read > 1) text += ` Processed ${Number(json.statistics.rows_read).toLocaleString()} rows.`;
-                return text;
+                SELECT toMonth(timestamp) AS mon, count() AS obs,
+                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS v_temperature,
+                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS v_dew_point,
+                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS v_wind_speed,
+                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS v_wind_gust,
+                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS v_wind_direction,
+                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS v_pressure,
+                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS v_station_pressure,
+                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS v_pressure_tendency,
+                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS v_visibility,
+                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS v_ceiling,
+                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS v_cloud_cover,
+                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 2) AS v_precipitation,
+                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS v_snow_depth,
+                    round(avgIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS v_sea_surface_temp,
+                    round(avgIf(cloud_base, cloud_base BETWEEN 0 AND 30000), 0) AS v_cloud_base
+                FROM {table:Identifier} WHERE ${condition}
+                GROUP BY mon ORDER BY mon`),
+            html: (json => {
+                const M = [{"c": "v_temperature", "l": "Temperature", "u": "°C", "col": "#e0552f", "d": 1}, {"c": "v_dew_point", "l": "Dew point", "u": "°C", "col": "#37a25a", "d": 1}, {"c": "v_wind_speed", "l": "Wind", "u": "m/s", "col": "#e0902a", "d": 1}, {"c": "v_wind_gust", "l": "Gust", "u": "m/s", "col": "#c25a12", "d": 1}, {"c": "v_wind_direction", "l": "Wind dir", "u": "°", "col": "#b58a2a", "d": 0}, {"c": "v_pressure", "l": "Sea-level P", "u": "hPa", "col": "#6a5acd", "d": 1}, {"c": "v_station_pressure", "l": "Station P", "u": "hPa", "col": "#9385db", "d": 1}, {"c": "v_pressure_tendency", "l": "P tend.", "u": "hPa", "col": "#a99adf", "d": 2}, {"c": "v_visibility", "l": "Visibility", "u": "km", "col": "#7f8c99", "d": 1}, {"c": "v_ceiling", "l": "Ceiling", "u": "m", "col": "#8a99a8", "d": 0}, {"c": "v_cloud_cover", "l": "Cloud", "u": "%", "col": "#788696", "d": 0}, {"c": "v_precipitation", "l": "Precip", "u": "mm", "col": "#2a6ad0", "d": 2}, {"c": "v_snow_depth", "l": "Snow", "u": "mm", "col": "#8ab6e0", "d": 1}, {"c": "v_sea_surface_temp", "l": "Sea temp", "u": "°C", "col": "#1ba0b0", "d": 1}, {"c": "v_cloud_base", "l": "Cloud base", "u": "m", "col": "#93a2b0", "d": 0}];
+                const rows = json.data || [];
+                const by = {}; let obs = 0;
+                rows.forEach(r => { by[+r.mon] = r; obs += Number(r.obs) || 0; });
+                const mo = [1,2,3,4,5,6,7,8,9,10,11,12], W = 150, H = 26;
+                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · monthly climatology (Jan → Dec)</div>`;
+                for (const m of M) {
+                    const vals = mo.map(x => (by[x] && by[x][m.c] != null) ? Number(by[x][m.c]) : null);
+                    const pv = vals.filter(v => v != null);
+                    if (pv.length < 2) continue;
+                    const lo = Math.min(...pv), hi = Math.max(...pv), rng = (hi - lo) || 1;
+                    const pts = vals.map((v,i) => v == null ? null :
+                        ((i/11*W).toFixed(1) + ',' + (H-2 - (v-lo)/rng*(H-4)).toFixed(1))).filter(Boolean).join(' ');
+                    out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
+                        + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
+                        + `<svg width="${W}" height="${H}" style="flex:0 0 auto;overflow:visible"><polyline points="${pts}" fill="none" stroke="${m.col}" stroke-width="1.5"/></svg>`
+                        + `<span style="flex:0 0 auto;opacity:.7;font-variant-numeric:tabular-nums">${lo.toFixed(m.d)}–${hi.toFixed(m.d)} ${m.u}</span></div>`;
+                }
+                return out || 'No data in the selected area.';
             }),
         },
         reports: [
@@ -3970,7 +3970,7 @@ ORDER BY n`
                 query: (condition => `
                     WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                         AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
-                    SELECT name, round(avgIf(temperature, isNotNull(temperature)), 1) AS t, count() AS c
+                    SELECT name, round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS t, count() AS c
                     FROM {table:Identifier}
                     WHERE name != '' AND ${condition}
                     GROUP BY name ORDER BY c DESC LIMIT 100`),
