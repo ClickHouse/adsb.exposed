@@ -1433,7 +1433,7 @@
         /// Special layer made of photos.
         async function getTopPhoto(coords) {
             /// This is fairly dirty.
-            let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+            let condition = /WHERE(.+?)GROUP BY/is.exec(query_elem.value)[1];
             const time_cond = getTimeCondition();
             if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
@@ -2132,7 +2132,7 @@
             const current_query = query_elem.value;
 
             /// This is fairly dirty.
-            let condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
+            let condition = /WHERE(.+?)GROUP BY/is.exec(current_query)[1];
 
             /// Apply the time slider window to the report queries as well.
             const time_cond = getTimeCondition();
@@ -2988,7 +2988,7 @@
 
                 /// Reuse the current query's WHERE (referencing in_tile), with in_tile
                 /// defined as the visible box — same shape as the report queries.
-                let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+                let condition = /WHERE(.+?)GROUP BY/is.exec(query_elem.value)[1];
                 const time_cond = getTimeCondition();
                 if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
