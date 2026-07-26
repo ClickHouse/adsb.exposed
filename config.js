@@ -3336,27 +3336,24 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
     mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
     bitShiftLeft(1::UInt64, 2 * (32 - {z:UInt8})) AS morton_span,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(255*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(cnt0[i+1] > 0, (toFloat64(sum0[i+1]/cnt0[i+1]), 0::UInt8), L1[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), range(16384)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(cnt1[i+1] > 0, (toFloat64(sum1[i+1]/cnt1[i+1]), 1::UInt8), L2[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(cnt2[i+1] > 0, (toFloat64(sum2[i+1]/cnt2[i+1]), 2::UInt8), L3[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(cnt3[i+1] > 0, (toFloat64(sum3[i+1]/cnt3[i+1]), 3::UInt8), L4[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(cnt4[i+1] > 0, (toFloat64(sum4[i+1]/cnt4[i+1]), 4::UInt8), L5[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(cnt5[i+1] > 0, (toFloat64(sum5[i+1]/cnt5[i+1]), 5::UInt8), L6[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(cnt6[i+1] > 0, (toFloat64(sum6[i+1]/cnt6[i+1]), 6::UInt8), L7[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L6 FROM (
-SELECT *, arrayMap(i -> if(cnt7[i+1] > 0, (toFloat64(sum7[i+1]/cnt7[i+1]), 7::UInt8), (CAST(NULL AS Nullable(Float64)), 8::UInt8)), range(1)) AS L7 FROM (
-SELECT *, arrayMap(i -> sum6[(2*(i DIV 1))*2+2*(i%1)+1] + sum6[(2*(i DIV 1))*2+2*(i%1)+1+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS sum7, arrayMap(i -> cnt6[(2*(i DIV 1))*2+2*(i%1)+1] + cnt6[(2*(i DIV 1))*2+2*(i%1)+1+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS cnt7 FROM (
-SELECT *, arrayMap(i -> sum5[(2*(i DIV 2))*4+2*(i%2)+1] + sum5[(2*(i DIV 2))*4+2*(i%2)+1+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS sum6, arrayMap(i -> cnt5[(2*(i DIV 2))*4+2*(i%2)+1] + cnt5[(2*(i DIV 2))*4+2*(i%2)+1+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS cnt6 FROM (
-SELECT *, arrayMap(i -> sum4[(2*(i DIV 4))*8+2*(i%4)+1] + sum4[(2*(i DIV 4))*8+2*(i%4)+1+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS sum5, arrayMap(i -> cnt4[(2*(i DIV 4))*8+2*(i%4)+1] + cnt4[(2*(i DIV 4))*8+2*(i%4)+1+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS cnt5 FROM (
-SELECT *, arrayMap(i -> sum3[(2*(i DIV 8))*16+2*(i%8)+1] + sum3[(2*(i DIV 8))*16+2*(i%8)+1+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS sum4, arrayMap(i -> cnt3[(2*(i DIV 8))*16+2*(i%8)+1] + cnt3[(2*(i DIV 8))*16+2*(i%8)+1+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS cnt4 FROM (
-SELECT *, arrayMap(i -> sum2[(2*(i DIV 16))*32+2*(i%16)+1] + sum2[(2*(i DIV 16))*32+2*(i%16)+1+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS sum3, arrayMap(i -> cnt2[(2*(i DIV 16))*32+2*(i%16)+1] + cnt2[(2*(i DIV 16))*32+2*(i%16)+1+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS cnt3 FROM (
-SELECT *, arrayMap(i -> sum1[(2*(i DIV 32))*64+2*(i%32)+1] + sum1[(2*(i DIV 32))*64+2*(i%32)+1+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS sum2, arrayMap(i -> cnt1[(2*(i DIV 32))*64+2*(i%32)+1] + cnt1[(2*(i DIV 32))*64+2*(i%32)+1+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS cnt2 FROM (
-SELECT *, arrayMap(i -> sum0[(2*(i DIV 64))*128+2*(i%64)+1] + sum0[(2*(i DIV 64))*128+2*(i%64)+1+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS sum1, arrayMap(i -> cnt0[(2*(i DIV 64))*128+2*(i%64)+1] + cnt0[(2*(i DIV 64))*128+2*(i%64)+1+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS cnt1 FROM (
-SELECT arrayMap(t -> t.1, grid0) AS sum0, arrayMap(t -> t.2, grid0) AS cnt0 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) AS grid0
+    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(255*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
+SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
+SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
+SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
+SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
+SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
+SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
+SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
+SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
+SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
+SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
+SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
+SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
+SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
+SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
+                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(temperature, isNotNull(temperature)), 0.0) AS s, countIf(isNotNull(temperature)) AS c
             FROM {table:Identifier}
             WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
@@ -3375,14 +3372,11 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell)
 )
 )
 )
-)
-)
-)
 ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT px[(number DIV 1024 DIV 8) * 128 + (number % 1024 DIV 8) + 1] AS rgba FROM numbers(1024 * 1024) )`,
+FROM ( SELECT px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )`,
 "Wind": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -3392,27 +3386,24 @@ FROM ( SELECT px[(number DIV 1024 DIV 8) * 128 + (number % 1024 DIV 8) + 1] AS r
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
     mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
     bitShiftLeft(1::UInt64, 2 * (32 - {z:UInt8})) AS morton_span,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(120*(1-m))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(cnt0[i+1] > 0, (toFloat64(sum0[i+1]/cnt0[i+1]), 0::UInt8), L1[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), range(16384)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(cnt1[i+1] > 0, (toFloat64(sum1[i+1]/cnt1[i+1]), 1::UInt8), L2[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(cnt2[i+1] > 0, (toFloat64(sum2[i+1]/cnt2[i+1]), 2::UInt8), L3[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(cnt3[i+1] > 0, (toFloat64(sum3[i+1]/cnt3[i+1]), 3::UInt8), L4[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(cnt4[i+1] > 0, (toFloat64(sum4[i+1]/cnt4[i+1]), 4::UInt8), L5[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(cnt5[i+1] > 0, (toFloat64(sum5[i+1]/cnt5[i+1]), 5::UInt8), L6[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(cnt6[i+1] > 0, (toFloat64(sum6[i+1]/cnt6[i+1]), 6::UInt8), L7[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L6 FROM (
-SELECT *, arrayMap(i -> if(cnt7[i+1] > 0, (toFloat64(sum7[i+1]/cnt7[i+1]), 7::UInt8), (CAST(NULL AS Nullable(Float64)), 8::UInt8)), range(1)) AS L7 FROM (
-SELECT *, arrayMap(i -> sum6[(2*(i DIV 1))*2+2*(i%1)+1] + sum6[(2*(i DIV 1))*2+2*(i%1)+1+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS sum7, arrayMap(i -> cnt6[(2*(i DIV 1))*2+2*(i%1)+1] + cnt6[(2*(i DIV 1))*2+2*(i%1)+1+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS cnt7 FROM (
-SELECT *, arrayMap(i -> sum5[(2*(i DIV 2))*4+2*(i%2)+1] + sum5[(2*(i DIV 2))*4+2*(i%2)+1+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS sum6, arrayMap(i -> cnt5[(2*(i DIV 2))*4+2*(i%2)+1] + cnt5[(2*(i DIV 2))*4+2*(i%2)+1+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS cnt6 FROM (
-SELECT *, arrayMap(i -> sum4[(2*(i DIV 4))*8+2*(i%4)+1] + sum4[(2*(i DIV 4))*8+2*(i%4)+1+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS sum5, arrayMap(i -> cnt4[(2*(i DIV 4))*8+2*(i%4)+1] + cnt4[(2*(i DIV 4))*8+2*(i%4)+1+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS cnt5 FROM (
-SELECT *, arrayMap(i -> sum3[(2*(i DIV 8))*16+2*(i%8)+1] + sum3[(2*(i DIV 8))*16+2*(i%8)+1+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS sum4, arrayMap(i -> cnt3[(2*(i DIV 8))*16+2*(i%8)+1] + cnt3[(2*(i DIV 8))*16+2*(i%8)+1+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS cnt4 FROM (
-SELECT *, arrayMap(i -> sum2[(2*(i DIV 16))*32+2*(i%16)+1] + sum2[(2*(i DIV 16))*32+2*(i%16)+1+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS sum3, arrayMap(i -> cnt2[(2*(i DIV 16))*32+2*(i%16)+1] + cnt2[(2*(i DIV 16))*32+2*(i%16)+1+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS cnt3 FROM (
-SELECT *, arrayMap(i -> sum1[(2*(i DIV 32))*64+2*(i%32)+1] + sum1[(2*(i DIV 32))*64+2*(i%32)+1+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS sum2, arrayMap(i -> cnt1[(2*(i DIV 32))*64+2*(i%32)+1] + cnt1[(2*(i DIV 32))*64+2*(i%32)+1+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS cnt2 FROM (
-SELECT *, arrayMap(i -> sum0[(2*(i DIV 64))*128+2*(i%64)+1] + sum0[(2*(i DIV 64))*128+2*(i%64)+1+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS sum1, arrayMap(i -> cnt0[(2*(i DIV 64))*128+2*(i%64)+1] + cnt0[(2*(i DIV 64))*128+2*(i%64)+1+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS cnt1 FROM (
-SELECT arrayMap(t -> t.1, grid0) AS sum0, arrayMap(t -> t.2, grid0) AS cnt0 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) AS grid0
+    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(120*(1-m))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
+SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
+SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
+SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
+SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
+SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
+SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
+SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
+SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
+SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
+SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
+SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
+SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
+SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
+SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
+                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(wind_speed, isNotNull(wind_speed)), 0.0) AS s, countIf(isNotNull(wind_speed)) AS c
             FROM {table:Identifier}
             WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
@@ -3431,14 +3422,11 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell)
 )
 )
 )
-)
-)
-)
 ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT px[(number DIV 1024 DIV 8) * 128 + (number % 1024 DIV 8) + 1] AS rgba FROM numbers(1024 * 1024) )`,
+FROM ( SELECT px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )`,
 "Pressure": `WITH
     bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
@@ -3448,27 +3436,24 @@ FROM ( SELECT px[(number DIV 1024 DIV 8) * 128 + (number % 1024 DIV 8) + 1] AS r
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
     mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
     bitShiftLeft(1::UInt64, 2 * (32 - {z:UInt8})) AS morton_span,
-    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(80+60*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30,21][t.2 + 1]), 24)) ).4, L0) AS px FROM (
-SELECT *, arrayMap(i -> if(cnt0[i+1] > 0, (toFloat64(sum0[i+1]/cnt0[i+1]), 0::UInt8), L1[((i DIV 128) DIV 2) * 64 + ((i % 128) DIV 2) + 1]), range(16384)) AS L0 FROM (
-SELECT *, arrayMap(i -> if(cnt1[i+1] > 0, (toFloat64(sum1[i+1]/cnt1[i+1]), 1::UInt8), L2[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L1 FROM (
-SELECT *, arrayMap(i -> if(cnt2[i+1] > 0, (toFloat64(sum2[i+1]/cnt2[i+1]), 2::UInt8), L3[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L2 FROM (
-SELECT *, arrayMap(i -> if(cnt3[i+1] > 0, (toFloat64(sum3[i+1]/cnt3[i+1]), 3::UInt8), L4[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L3 FROM (
-SELECT *, arrayMap(i -> if(cnt4[i+1] > 0, (toFloat64(sum4[i+1]/cnt4[i+1]), 4::UInt8), L5[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L4 FROM (
-SELECT *, arrayMap(i -> if(cnt5[i+1] > 0, (toFloat64(sum5[i+1]/cnt5[i+1]), 5::UInt8), L6[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L5 FROM (
-SELECT *, arrayMap(i -> if(cnt6[i+1] > 0, (toFloat64(sum6[i+1]/cnt6[i+1]), 6::UInt8), L7[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L6 FROM (
-SELECT *, arrayMap(i -> if(cnt7[i+1] > 0, (toFloat64(sum7[i+1]/cnt7[i+1]), 7::UInt8), (CAST(NULL AS Nullable(Float64)), 8::UInt8)), range(1)) AS L7 FROM (
-SELECT *, arrayMap(i -> sum6[(2*(i DIV 1))*2+2*(i%1)+1] + sum6[(2*(i DIV 1))*2+2*(i%1)+1+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + sum6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS sum7, arrayMap(i -> cnt6[(2*(i DIV 1))*2+2*(i%1)+1] + cnt6[(2*(i DIV 1))*2+2*(i%1)+1+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1] + cnt6[(2*(i DIV 1)+1)*2+2*(i%1)+1+1], range(1)) AS cnt7 FROM (
-SELECT *, arrayMap(i -> sum5[(2*(i DIV 2))*4+2*(i%2)+1] + sum5[(2*(i DIV 2))*4+2*(i%2)+1+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + sum5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS sum6, arrayMap(i -> cnt5[(2*(i DIV 2))*4+2*(i%2)+1] + cnt5[(2*(i DIV 2))*4+2*(i%2)+1+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1] + cnt5[(2*(i DIV 2)+1)*4+2*(i%2)+1+1], range(4)) AS cnt6 FROM (
-SELECT *, arrayMap(i -> sum4[(2*(i DIV 4))*8+2*(i%4)+1] + sum4[(2*(i DIV 4))*8+2*(i%4)+1+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + sum4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS sum5, arrayMap(i -> cnt4[(2*(i DIV 4))*8+2*(i%4)+1] + cnt4[(2*(i DIV 4))*8+2*(i%4)+1+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1] + cnt4[(2*(i DIV 4)+1)*8+2*(i%4)+1+1], range(16)) AS cnt5 FROM (
-SELECT *, arrayMap(i -> sum3[(2*(i DIV 8))*16+2*(i%8)+1] + sum3[(2*(i DIV 8))*16+2*(i%8)+1+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + sum3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS sum4, arrayMap(i -> cnt3[(2*(i DIV 8))*16+2*(i%8)+1] + cnt3[(2*(i DIV 8))*16+2*(i%8)+1+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1] + cnt3[(2*(i DIV 8)+1)*16+2*(i%8)+1+1], range(64)) AS cnt4 FROM (
-SELECT *, arrayMap(i -> sum2[(2*(i DIV 16))*32+2*(i%16)+1] + sum2[(2*(i DIV 16))*32+2*(i%16)+1+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + sum2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS sum3, arrayMap(i -> cnt2[(2*(i DIV 16))*32+2*(i%16)+1] + cnt2[(2*(i DIV 16))*32+2*(i%16)+1+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1] + cnt2[(2*(i DIV 16)+1)*32+2*(i%16)+1+1], range(256)) AS cnt3 FROM (
-SELECT *, arrayMap(i -> sum1[(2*(i DIV 32))*64+2*(i%32)+1] + sum1[(2*(i DIV 32))*64+2*(i%32)+1+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + sum1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS sum2, arrayMap(i -> cnt1[(2*(i DIV 32))*64+2*(i%32)+1] + cnt1[(2*(i DIV 32))*64+2*(i%32)+1+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1] + cnt1[(2*(i DIV 32)+1)*64+2*(i%32)+1+1], range(1024)) AS cnt2 FROM (
-SELECT *, arrayMap(i -> sum0[(2*(i DIV 64))*128+2*(i%64)+1] + sum0[(2*(i DIV 64))*128+2*(i%64)+1+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + sum0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS sum1, arrayMap(i -> cnt0[(2*(i DIV 64))*128+2*(i%64)+1] + cnt0[(2*(i DIV 64))*128+2*(i%64)+1+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1] + cnt0[(2*(i DIV 64)+1)*128+2*(i%64)+1+1], range(4096)) AS cnt1 FROM (
-SELECT arrayMap(t -> t.1, grid0) AS sum0, arrayMap(t -> t.2, grid0) AS cnt0 FROM (
-SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell) AS grid0
+    ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(80+60*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
+SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
+SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
+SELECT *, arrayMap(i -> if(g2[i+1].2 > 0, (g2[i+1].1 / g2[i+1].2, 2::UInt8), L3[((i DIV 16) DIV 2) * 8 + ((i % 16) DIV 2) + 1]), range(256)) AS L2 FROM (
+SELECT *, arrayMap(i -> if(g3[i+1].2 > 0, (g3[i+1].1 / g3[i+1].2, 3::UInt8), L4[((i DIV 8) DIV 2) * 4 + ((i % 8) DIV 2) + 1]), range(64)) AS L3 FROM (
+SELECT *, arrayMap(i -> if(g4[i+1].2 > 0, (g4[i+1].1 / g4[i+1].2, 4::UInt8), L5[((i DIV 4) DIV 2) * 2 + ((i % 4) DIV 2) + 1]), range(16)) AS L4 FROM (
+SELECT *, arrayMap(i -> if(g5[i+1].2 > 0, (g5[i+1].1 / g5[i+1].2, 5::UInt8), L6[((i DIV 2) DIV 2) * 1 + ((i % 2) DIV 2) + 1]), range(4)) AS L5 FROM (
+SELECT *, arrayMap(i -> if(g6[i+1].2 > 0, (g6[i+1].1 / g6[i+1].2, 6::UInt8), (CAST(NULL AS Nullable(Float64)), 7::UInt8)), range(1)) AS L6 FROM (
+SELECT *, arrayMap(i -> (g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].1 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].1, g5[(2*(i DIV 1)+0)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+0)*2+2*(i%1)+1+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+0+1].2 + g5[(2*(i DIV 1)+1)*2+2*(i%1)+1+1].2), range(1)) AS g6 FROM (
+SELECT *, arrayMap(i -> (g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].1 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].1, g4[(2*(i DIV 2)+0)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+0)*4+2*(i%2)+1+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+0+1].2 + g4[(2*(i DIV 2)+1)*4+2*(i%2)+1+1].2), range(4)) AS g5 FROM (
+SELECT *, arrayMap(i -> (g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].1 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].1, g3[(2*(i DIV 4)+0)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+0)*8+2*(i%4)+1+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+0+1].2 + g3[(2*(i DIV 4)+1)*8+2*(i%4)+1+1].2), range(16)) AS g4 FROM (
+SELECT *, arrayMap(i -> (g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].1 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].1, g2[(2*(i DIV 8)+0)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+0)*16+2*(i%8)+1+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+0+1].2 + g2[(2*(i DIV 8)+1)*16+2*(i%8)+1+1].2), range(64)) AS g3 FROM (
+SELECT *, arrayMap(i -> (g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].1 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].1, g1[(2*(i DIV 16)+0)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+0)*32+2*(i%16)+1+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+0+1].2 + g1[(2*(i DIV 16)+1)*32+2*(i%16)+1+1].2), range(256)) AS g2 FROM (
+SELECT *, arrayMap(i -> (g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].1 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].1, g0[(2*(i DIV 32)+0)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+0)*64+2*(i%32)+1+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+0+1].2 + g0[(2*(i DIV 32)+1)*64+2*(i%32)+1+1].2), range(1024)) AS g1 FROM (
+SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) AS g0
         FROM (
-            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 7 - {z:UInt8}) * 128
-                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 7 - {z:UInt8}))::UInt32 AS cell,
+            SELECT (bitShiftRight(mercator_y - tile_y_begin, 32 - 6 - {z:UInt8}) * 64
+                  + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(pressure, isNotNull(pressure)), 0.0) AS s, countIf(isNotNull(pressure)) AS c
             FROM {table:Identifier}
             WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
@@ -3487,14 +3472,11 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((s, c), cell)
 )
 )
 )
-)
-)
-)
 ) ) AS px
 SELECT
     toUInt8(rgba % 256) AS red, toUInt8(rgba DIV 256 % 256) AS green,
     toUInt8(rgba DIV 65536 % 256) AS blue, toUInt8(rgba DIV 16777216 % 256) AS alpha
-FROM ( SELECT px[(number DIV 1024 DIV 8) * 128 + (number % 1024 DIV 8) + 1] AS rgba FROM numbers(1024 * 1024) )`
+FROM ( SELECT px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )`
         }
     },
 
