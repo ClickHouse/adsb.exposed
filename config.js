@@ -3298,21 +3298,21 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
                 SELECT count() AS obs, uniq(station) AS stations,
-                    round(avgIf(temperature, isNotNull(temperature)), 1) AS temp,
-                    round(avgIf(dew_point, isNotNull(dew_point)), 1) AS dew,
-                    round(avgIf(relative_humidity, isNotNull(relative_humidity)), 0) AS rh,
-                    round(avgIf(wet_bulb, isNotNull(wet_bulb)), 1) AS wb,
-                    round(avgIf(wind_speed, isNotNull(wind_speed)), 1) AS wspd,
-                    round(avgIf(wind_gust, isNotNull(wind_gust)), 1) AS gust,
-                    round(avgIf(wind_direction, isNotNull(wind_direction)), 0) AS wdir,
-                    round(avgIf(pressure, isNotNull(pressure)), 1) AS slp,
-                    round(avgIf(station_pressure, isNotNull(station_pressure)), 1) AS statp,
-                    round(avgIf(pressure_tendency, isNotNull(pressure_tendency)), 2) AS tend,
-                    round(avgIf(visibility, isNotNull(visibility)), 1) AS vis,
-                    round(avgIf(ceiling, isNotNull(ceiling)), 0) AS ceil,
-                    round(avgIf(cloud_cover, isNotNull(cloud_cover)), 0) AS cloud,
-                    round(avgIf(precipitation, isNotNull(precipitation)), 3) AS precip,
-                    round(avgIf(snow_depth, isNotNull(snow_depth)), 1) AS snow,
+                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS temp,
+                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS dew,
+                    round(avgIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0) AS rh,
+                    round(avgIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 1) AS wb,
+                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS wspd,
+                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS gust,
+                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS wdir,
+                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS slp,
+                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS statp,
+                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS tend,
+                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS vis,
+                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS ceil,
+                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS cloud,
+                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 3) AS precip,
+                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS snow,
                     min(timestamp) AS first, max(timestamp) AS last
                 FROM {table:Identifier} WHERE ${condition}`),
             content: (json => {
@@ -3362,7 +3362,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(temperature, isNotNull(temperature)), 0.0) AS s, countIf(isNotNull(temperature)) AS c
+                  ifNull(sumIf(temperature, temperature BETWEEN -95 AND 65), 0.0) AS s, countIf(temperature BETWEEN -95 AND 65) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3412,7 +3412,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(dew_point, isNotNull(dew_point)), 0.0) AS s, countIf(isNotNull(dew_point)) AS c
+                  ifNull(sumIf(dew_point, dew_point BETWEEN -100 AND 45), 0.0) AS s, countIf(dew_point BETWEEN -100 AND 45) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3462,7 +3462,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(wind_speed, isNotNull(wind_speed)), 0.0) AS s, countIf(isNotNull(wind_speed)) AS c
+                  ifNull(sumIf(wind_speed, wind_speed BETWEEN 0 AND 120), 0.0) AS s, countIf(wind_speed BETWEEN 0 AND 120) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3512,7 +3512,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(wind_gust, isNotNull(wind_gust)), 0.0) AS s, countIf(isNotNull(wind_gust)) AS c
+                  ifNull(sumIf(wind_gust, wind_gust BETWEEN 0 AND 160), 0.0) AS s, countIf(wind_gust BETWEEN 0 AND 160) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3562,7 +3562,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(pressure, isNotNull(pressure)), 0.0) AS s, countIf(isNotNull(pressure)) AS c
+                  ifNull(sumIf(pressure, pressure BETWEEN 850 AND 1090), 0.0) AS s, countIf(pressure BETWEEN 850 AND 1090) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3612,7 +3612,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(visibility, isNotNull(visibility)), 0.0) AS s, countIf(isNotNull(visibility)) AS c
+                  ifNull(sumIf(visibility, visibility BETWEEN 0 AND 100), 0.0) AS s, countIf(visibility BETWEEN 0 AND 100) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3662,7 +3662,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(cloud_cover, isNotNull(cloud_cover)), 0.0) AS s, countIf(isNotNull(cloud_cover)) AS c
+                  ifNull(sumIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0.0) AS s, countIf(cloud_cover BETWEEN 0 AND 100) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3712,7 +3712,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(precipitation, isNotNull(precipitation)), 0.0) AS s, countIf(isNotNull(precipitation)) AS c
+                  ifNull(sumIf(precipitation, precipitation BETWEEN 0 AND 50), 0.0) AS s, countIf(precipitation BETWEEN 0 AND 50) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3762,7 +3762,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(snow_depth, isNotNull(snow_depth)), 0.0) AS s, countIf(isNotNull(snow_depth)) AS c
+                  ifNull(sumIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 0.0) AS s, countIf(snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3812,7 +3812,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(relative_humidity, isNotNull(relative_humidity)), 0.0) AS s, countIf(isNotNull(relative_humidity)) AS c
+                  ifNull(sumIf(relative_humidity, relative_humidity BETWEEN 0 AND 100), 0.0) AS s, countIf(relative_humidity BETWEEN 0 AND 100) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3862,7 +3862,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(wet_bulb, isNotNull(wet_bulb)), 0.0) AS s, countIf(isNotNull(wet_bulb)) AS c
+                  ifNull(sumIf(wet_bulb, wet_bulb BETWEEN -95 AND 45), 0.0) AS s, countIf(wet_bulb BETWEEN -95 AND 45) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -3927,20 +3927,20 @@ ORDER BY n`
                 WITH mercator_x >= {left:UInt32} AND mercator_x < {right:UInt32}
                     AND mercator_y >= {top:UInt32} AND mercator_y < {bottom:UInt32} AS in_tile
                 SELECT count() AS obs, uniq(station) AS stations,
-                    round(avgIf(temperature, isNotNull(temperature)), 1) AS temp,
-                    round(avgIf(dew_point, isNotNull(dew_point)), 1) AS dew,
-                    round(avgIf(wind_speed, isNotNull(wind_speed)), 1) AS wspd,
-                    round(avgIf(wind_gust, isNotNull(wind_gust)), 1) AS gust,
-                    round(avgIf(wind_direction, isNotNull(wind_direction)), 0) AS wdir,
-                    round(avgIf(pressure, isNotNull(pressure)), 1) AS slp,
-                    round(avgIf(station_pressure, isNotNull(station_pressure)), 1) AS statp,
-                    round(avgIf(pressure_tendency, isNotNull(pressure_tendency)), 2) AS tend,
-                    round(avgIf(visibility, isNotNull(visibility)), 1) AS vis,
-                    round(avgIf(ceiling, isNotNull(ceiling)), 0) AS ceil,
-                    round(avgIf(cloud_cover, isNotNull(cloud_cover)), 0) AS cloud,
-                    round(avgIf(precipitation, isNotNull(precipitation)), 3) AS precip,
-                    round(avgIf(snow_depth, isNotNull(snow_depth)), 1) AS snow,
-                    round(avgIf(sea_surface_temp, isNotNull(sea_surface_temp)), 1) AS sst,
+                    round(avgIf(temperature, temperature BETWEEN -95 AND 65), 1) AS temp,
+                    round(avgIf(dew_point, dew_point BETWEEN -100 AND 45), 1) AS dew,
+                    round(avgIf(wind_speed, wind_speed BETWEEN 0 AND 120), 1) AS wspd,
+                    round(avgIf(wind_gust, wind_gust BETWEEN 0 AND 160), 1) AS gust,
+                    round(avgIf(wind_direction, wind_direction BETWEEN 0 AND 360), 0) AS wdir,
+                    round(avgIf(pressure, pressure BETWEEN 850 AND 1090), 1) AS slp,
+                    round(avgIf(station_pressure, station_pressure BETWEEN 400 AND 1090), 1) AS statp,
+                    round(avgIf(pressure_tendency, pressure_tendency BETWEEN -100 AND 100), 2) AS tend,
+                    round(avgIf(visibility, visibility BETWEEN 0 AND 100), 1) AS vis,
+                    round(avgIf(ceiling, ceiling BETWEEN 0 AND 30000), 0) AS ceil,
+                    round(avgIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0) AS cloud,
+                    round(avgIf(precipitation, precipitation BETWEEN 0 AND 50), 3) AS precip,
+                    round(avgIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 1) AS snow,
+                    round(avgIf(sea_surface_temp, sea_surface_temp BETWEEN -5 AND 45), 1) AS sst,
                     min(timestamp) AS first, max(timestamp) AS last
                 FROM {table:Identifier} WHERE ${condition}`),
             content: (json => {
@@ -3989,7 +3989,7 @@ ORDER BY n`
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(temperature, isNotNull(temperature)), 0.0) AS s, countIf(isNotNull(temperature)) AS c
+                  ifNull(sumIf(temperature, temperature BETWEEN -95 AND 65), 0.0) AS s, countIf(temperature BETWEEN -95 AND 65) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4039,7 +4039,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(dew_point, isNotNull(dew_point)), 0.0) AS s, countIf(isNotNull(dew_point)) AS c
+                  ifNull(sumIf(dew_point, dew_point BETWEEN -100 AND 45), 0.0) AS s, countIf(dew_point BETWEEN -100 AND 45) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4089,7 +4089,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(wind_speed, isNotNull(wind_speed)), 0.0) AS s, countIf(isNotNull(wind_speed)) AS c
+                  ifNull(sumIf(wind_speed, wind_speed BETWEEN 0 AND 120), 0.0) AS s, countIf(wind_speed BETWEEN 0 AND 120) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4139,7 +4139,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(wind_gust, isNotNull(wind_gust)), 0.0) AS s, countIf(isNotNull(wind_gust)) AS c
+                  ifNull(sumIf(wind_gust, wind_gust BETWEEN 0 AND 160), 0.0) AS s, countIf(wind_gust BETWEEN 0 AND 160) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4189,7 +4189,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(pressure, isNotNull(pressure)), 0.0) AS s, countIf(isNotNull(pressure)) AS c
+                  ifNull(sumIf(pressure, pressure BETWEEN 850 AND 1090), 0.0) AS s, countIf(pressure BETWEEN 850 AND 1090) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4239,7 +4239,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(visibility, isNotNull(visibility)), 0.0) AS s, countIf(isNotNull(visibility)) AS c
+                  ifNull(sumIf(visibility, visibility BETWEEN 0 AND 100), 0.0) AS s, countIf(visibility BETWEEN 0 AND 100) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4289,7 +4289,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(cloud_cover, isNotNull(cloud_cover)), 0.0) AS s, countIf(isNotNull(cloud_cover)) AS c
+                  ifNull(sumIf(cloud_cover, cloud_cover BETWEEN 0 AND 100), 0.0) AS s, countIf(cloud_cover BETWEEN 0 AND 100) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4339,7 +4339,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(precipitation, isNotNull(precipitation)), 0.0) AS s, countIf(isNotNull(precipitation)) AS c
+                  ifNull(sumIf(precipitation, precipitation BETWEEN 0 AND 50), 0.0) AS s, countIf(precipitation BETWEEN 0 AND 50) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
@@ -4389,7 +4389,7 @@ ORDER BY n`,
         FROM (
             SELECT (bitShiftRight(mercator_y - tile_y_begin, 24 - {z:UInt8}) * 256
                   + bitShiftRight(mercator_x - tile_x_begin, 24 - {z:UInt8}))::UInt32 AS cell,
-                  ifNull(sumIf(snow_depth, isNotNull(snow_depth)), 0.0) AS s, countIf(isNotNull(snow_depth)) AS c
+                  ifNull(sumIf(snow_depth, snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)), 0.0) AS s, countIf(snow_depth BETWEEN 0 AND 12000 AND (temperature IS NULL OR temperature < 20)) AS c
             FROM {table:Identifier} WHERE in_tile GROUP BY cell ) ) AS g0,
     ( SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 16384)((bs, bc), blk)
         FROM ( SELECT (((idx DIV 256) DIV 2) * 128 + ((idx % 256) DIV 2))::UInt32 AS blk,
