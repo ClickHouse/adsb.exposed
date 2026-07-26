@@ -3328,14 +3328,11 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
         ],
         queries: {
 "Temperature": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin, tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
-    mortonEncode(toUInt32(tile_x_end - 1), toUInt32(tile_y_end - 1)) AS morton_hi,
     ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val + 30) / 70)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(255*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
 SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
 SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
@@ -3356,8 +3353,7 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) 
                   + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(temperature, isNotNull(temperature)), 0.0) AS s, countIf(isNotNull(temperature)) AS c
             FROM {table:Identifier}
-            WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
-              AND mortonEncode(mercator_x, mercator_y) <= morton_hi AND in_tile
+            WHERE in_tile
             GROUP BY cell )
 )
 )
@@ -3379,14 +3375,11 @@ SELECT
 FROM ( SELECT number AS n, px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )
 ORDER BY n`,
 "Wind": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin, tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
-    mortonEncode(toUInt32(tile_x_end - 1), toUInt32(tile_y_end - 1)) AS morton_hi,
     ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, least(1, val / 15) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(120*(1-m))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
 SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
 SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
@@ -3407,8 +3400,7 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) 
                   + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(wind_speed, isNotNull(wind_speed)), 0.0) AS s, countIf(isNotNull(wind_speed)) AS c
             FROM {table:Identifier}
-            WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
-              AND mortonEncode(mercator_x, mercator_y) <= morton_hi AND in_tile
+            WHERE in_tile
             GROUP BY cell )
 )
 )
@@ -3430,14 +3422,11 @@ SELECT
 FROM ( SELECT number AS n, px[(number DIV 1024 DIV 16) * 64 + (number % 1024 DIV 16) + 1] AS rgba FROM numbers(1024 * 1024) )
 ORDER BY n`,
 "Pressure": `WITH
-    bitShiftLeft(1::UInt64, {z:UInt8}) AS zoom_factor,
     bitShiftLeft(1::UInt64, 32 - {z:UInt8}) AS tile_size,
     tile_size * {x:UInt32} AS tile_x_begin, tile_size * ({x:UInt32} + 1) AS tile_x_end,
     tile_size * {y:UInt32} AS tile_y_begin, tile_size * ({y:UInt32} + 1) AS tile_y_end,
     mercator_x >= tile_x_begin AND mercator_x < tile_x_end
     AND mercator_y >= tile_y_begin AND mercator_y < tile_y_end AS in_tile,
-    mortonEncode(toUInt32(tile_x_begin), toUInt32(tile_y_begin)) AS morton_lo,
-    mortonEncode(toUInt32(tile_x_end - 1), toUInt32(tile_y_end - 1)) AS morton_hi,
     ( SELECT arrayMap(t -> ( t.1 AS v, ifNull(v, 0) AS val, greatest(0, least(1, (val - 985) / 55)) AS m, if(isNull(v), 0, toUInt32(round(255*m)) + bitShiftLeft(toUInt32(round(80+60*(1-abs(m-0.5)*2))), 8) + bitShiftLeft(toUInt32(round(255*(1-m))), 16) + bitShiftLeft(toUInt32([255,178,125,87,61,43,30][t.2 + 1]), 24)) ).4, L0) AS px FROM (
 SELECT *, arrayMap(i -> if(g0[i+1].2 > 0, (g0[i+1].1 / g0[i+1].2, 0::UInt8), L1[((i DIV 64) DIV 2) * 32 + ((i % 64) DIV 2) + 1]), range(4096)) AS L0 FROM (
 SELECT *, arrayMap(i -> if(g1[i+1].2 > 0, (g1[i+1].1 / g1[i+1].2, 1::UInt8), L2[((i DIV 32) DIV 2) * 16 + ((i % 32) DIV 2) + 1]), range(1024)) AS L1 FROM (
@@ -3458,8 +3447,7 @@ SELECT groupArrayInsertAt((0.0, 0)::Tuple(Float64, UInt64), 4096)((s, c), cell) 
                   + bitShiftRight(mercator_x - tile_x_begin, 32 - 6 - {z:UInt8}))::UInt32 AS cell,
                   ifNull(sumIf(pressure, isNotNull(pressure)), 0.0) AS s, countIf(isNotNull(pressure)) AS c
             FROM {table:Identifier}
-            WHERE mortonEncode(mercator_x, mercator_y) >= morton_lo
-              AND mortonEncode(mercator_x, mercator_y) <= morton_hi AND in_tile
+            WHERE in_tile
             GROUP BY cell )
 )
 )
