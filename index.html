@@ -2467,8 +2467,8 @@
             if (hdr) hdr.textContent = fmt(s.days[bi]) + (s.bsize > 1 ? ' – ' + fmt(s.days[bi] + s.bsize - 1) : '');
             s.metrics.forEach((m, i) => {
                 if (!vals[i]) return;
-                const v = m.v[bi];
-                vals[i].textContent = (v && v[1] != null) ? (num(v[1], m.dec) + ' ' + m.unit) : '—';
+                const v = m.v[bi];   // [p1, avg, p99]; show the 1–99% interval at the hovered bucket
+                vals[i].textContent = (v && v[0] != null) ? (num(v[0], m.dec) + '–' + num(v[2], m.dec) + ' ' + m.unit) : '—';
             });
         }
 
