@@ -3323,41 +3323,47 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 for (const r of rows) { obs += Number(r.obs) || 0; const d = +r.day; if (d < dmin) dmin = d; if (d > dmax) dmax = d; }
                 const span = (dmax - dmin) || 1, W = 400, H = 26;
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
-                const f = (v, d) => (+v.toFixed(d)).toString();   // drop trailing zeros
-                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
-                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} 1–99% &amp; avg · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
-                // Normal bucket spacing (min gap between consecutive buckets); larger gaps = missing periods.
+                const f = (v, d) => (+v.toFixed(d)).toString();
                 let step = Infinity;
                 for (let i = 1; i < rows.length; i++) { const dd = (+rows[i].day) - (+rows[i-1].day); if (dd > 0 && dd < step) step = dd; }
                 if (!isFinite(step)) step = 1;
+                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
+                const hdr = `${obs.toLocaleString()} observations · ${bkt} 1–99% + avg · ${fmt(dmin)} → ${fmt(dmax)}`;
+                const days = rows.map(r => +r.day);
+                const series = { days, bsize: step, hdr, metrics: [] };
+                let body = '';
                 for (const m of M) {
-                    let lo = Infinity, hi = -Infinity; const pres = [];
-                    for (const r of rows) { const a = r[m.lo]; if (a == null) continue;   // avg/hi share the same validity
-                        const la = +a, hb = +r[m.hi]; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        pres.push([+r.day, la, hb, +r[m.avg]]); }
+                    let lo = Infinity, hi = -Infinity; const pres = [], v = [];
+                    for (const r of rows) { const a = r[m.lo];
+                        if (a == null) { v.push(null); continue; }
+                        const la = +a, hb = +r[m.hi], av = +r[m.avg];
+                        if (la < lo) lo = la; if (hb > hi) hi = hb;
+                        pres.push([+r.day, la, hb, av]); v.push([la, av, hb]); }
                     if (pres.length < 1) continue;
-                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // break into contiguous runs (no time gap); render each run separately so gaps stay empty
+                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = q => (H-2 - (q-lo)/rng*(H-4)).toFixed(1);
                     let band = '', line = '', seg = [];
                     const flush = () => {
                         if (!seg.length) return;
                         if (seg.length === 1) { const p = seg[0]; band += `M${X(p[0])},${Y(p[2])}L${X(p[0])},${Y(p[1])}`; }
-                        else {
-                            band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
-                            line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L');
-                        }
+                        else { band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
+                               line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L'); }
                         seg = [];
                     };
                     for (let i = 0; i < pres.length; i++) { if (i > 0 && pres[i][0] - pres[i-1][0] > step * 1.5) flush(); seg.push(pres[i]); }
                     flush();
-                    out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
+                    series.metrics.push({ label: m.l, unit: m.u, dec: m.d, range: `${f(lo,m.d)}–${f(hi,m.d)} ${m.u}`, v });
+                    body += `<div class="wrow" style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
-                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
+                        + `<svg class="wspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
                         + `<path d="${band}" fill="${m.col}" fill-opacity="0.2" stroke="${m.col}" stroke-opacity="0.35" stroke-width="0.5" vector-effect="non-scaling-stroke"/>`
                         + `<path d="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
-                        + `<span style="flex:0 0 88px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums">${f(lo,m.d)}–${f(hi,m.d)} ${m.u}</span></div>`;
+                        + `<span class="wval" style="flex:0 0 88px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums">${f(lo,m.d)}–${f(hi,m.d)} ${m.u}</span></div>`;
                 }
-                return out;
+                const attr = JSON.stringify(series).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+                return `<div id="wcharts" style="position:relative" data-series='${attr}' onmousemove="weatherHover(event)" onmouseleave="weatherHover()">`
+                    + `<div id="wline" style="position:absolute;top:20px;bottom:0;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
+                    + `<div id="whdr" style="margin:2px 0 6px;opacity:.75">${hdr}</div>`
+                    + body + `</div>`;
             }),
         },
         reports: [
@@ -4024,41 +4030,47 @@ ORDER BY n`
                 for (const r of rows) { obs += Number(r.obs) || 0; const d = +r.day; if (d < dmin) dmin = d; if (d > dmax) dmax = d; }
                 const span = (dmax - dmin) || 1, W = 400, H = 26;
                 const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
-                const f = (v, d) => (+v.toFixed(d)).toString();   // drop trailing zeros
-                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
-                let out = `<div style="margin:2px 0 6px;opacity:.75">${obs.toLocaleString()} observations · ${bkt} 1–99% &amp; avg · ${fmt(dmin)} → ${fmt(dmax)}</div>`;
-                // Normal bucket spacing (min gap between consecutive buckets); larger gaps = missing periods.
+                const f = (v, d) => (+v.toFixed(d)).toString();
                 let step = Infinity;
                 for (let i = 1; i < rows.length; i++) { const dd = (+rows[i].day) - (+rows[i-1].day); if (dd > 0 && dd < step) step = dd; }
                 if (!isFinite(step)) step = 1;
+                const bkt = span <= 400 ? 'daily' : span <= 2800 ? 'weekly' : span <= 12000 ? 'monthly' : span <= 36000 ? 'quarterly' : 'yearly';
+                const hdr = `${obs.toLocaleString()} observations · ${bkt} 1–99% + avg · ${fmt(dmin)} → ${fmt(dmax)}`;
+                const days = rows.map(r => +r.day);
+                const series = { days, bsize: step, hdr, metrics: [] };
+                let body = '';
                 for (const m of M) {
-                    let lo = Infinity, hi = -Infinity; const pres = [];
-                    for (const r of rows) { const a = r[m.lo]; if (a == null) continue;   // avg/hi share the same validity
-                        const la = +a, hb = +r[m.hi]; if (la < lo) lo = la; if (hb > hi) hi = hb;
-                        pres.push([+r.day, la, hb, +r[m.avg]]); }
+                    let lo = Infinity, hi = -Infinity; const pres = [], v = [];
+                    for (const r of rows) { const a = r[m.lo];
+                        if (a == null) { v.push(null); continue; }
+                        const la = +a, hb = +r[m.hi], av = +r[m.avg];
+                        if (la < lo) lo = la; if (hb > hi) hi = hb;
+                        pres.push([+r.day, la, hb, av]); v.push([la, av, hb]); }
                     if (pres.length < 1) continue;
-                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = v => (H-2 - (v-lo)/rng*(H-4)).toFixed(1);
-                    // break into contiguous runs (no time gap); render each run separately so gaps stay empty
+                    const rng = (hi - lo) || 1, X = d => ((d-dmin)/span*W).toFixed(1), Y = q => (H-2 - (q-lo)/rng*(H-4)).toFixed(1);
                     let band = '', line = '', seg = [];
                     const flush = () => {
                         if (!seg.length) return;
                         if (seg.length === 1) { const p = seg[0]; band += `M${X(p[0])},${Y(p[2])}L${X(p[0])},${Y(p[1])}`; }
-                        else {
-                            band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
-                            line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L');
-                        }
+                        else { band += 'M' + seg.map(p => X(p[0])+','+Y(p[2])).join('L') + 'L' + seg.slice().reverse().map(p => X(p[0])+','+Y(p[1])).join('L') + 'Z';
+                               line += 'M' + seg.map(p => X(p[0])+','+Y(p[3])).join('L'); }
                         seg = [];
                     };
                     for (let i = 0; i < pres.length; i++) { if (i > 0 && pres[i][0] - pres[i-1][0] > step * 1.5) flush(); seg.push(pres[i]); }
                     flush();
-                    out += `<div style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
+                    series.metrics.push({ label: m.l, unit: m.u, dec: m.d, range: `${f(lo,m.d)}–${f(hi,m.d)} ${m.u}`, v });
+                    body += `<div class="wrow" style="display:flex;align-items:center;gap:6px;font-size:11px;margin:1px 0">`
                         + `<span style="flex:0 0 74px;text-align:right;opacity:.85">${m.l}</span>`
-                        + `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
+                        + `<svg class="wspark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" style="flex:1 1 auto;min-width:0;height:${H}px">`
                         + `<path d="${band}" fill="${m.col}" fill-opacity="0.2" stroke="${m.col}" stroke-opacity="0.35" stroke-width="0.5" vector-effect="non-scaling-stroke"/>`
                         + `<path d="${line}" fill="none" stroke="${m.col}" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>`
-                        + `<span style="flex:0 0 88px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums">${f(lo,m.d)}–${f(hi,m.d)} ${m.u}</span></div>`;
+                        + `<span class="wval" style="flex:0 0 88px;text-align:right;opacity:.7;font-variant-numeric:tabular-nums">${f(lo,m.d)}–${f(hi,m.d)} ${m.u}</span></div>`;
                 }
-                return out;
+                const attr = JSON.stringify(series).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+                return `<div id="wcharts" style="position:relative" data-series='${attr}' onmousemove="weatherHover(event)" onmouseleave="weatherHover()">`
+                    + `<div id="wline" style="position:absolute;top:20px;bottom:0;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
+                    + `<div id="whdr" style="margin:2px 0 6px;opacity:.75">${hdr}</div>`
+                    + body + `</div>`;
             }),
         },
         reports: [

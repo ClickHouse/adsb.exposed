@@ -2432,6 +2432,46 @@
             updateTimeSlider();
         }
 
+        /// Hover interaction for the Weather area-report charts (config.report_total.html output).
+        /// Draws a shared vertical cursor across the charts, swaps each metric's right-hand value
+        /// from its total range to the hovered bucket's average, and shows the bucket's date range
+        /// in the header. Called from inline handlers on #wcharts; no-arg call resets.
+        function weatherHover(event) {
+            const box = document.getElementById('wcharts');
+            if (!box) return;
+            if (!box._s) { try { box._s = JSON.parse(box.dataset.series); } catch (e) { return; } }
+            const s = box._s;
+            const line = document.getElementById('wline');
+            const hdr = document.getElementById('whdr');
+            const vals = box.querySelectorAll('.wval');
+            const svg = box.querySelector('.wspark');
+            const num = (v, d) => (+v.toFixed(d)).toString();
+            const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
+            if (!event || !svg || !s.days.length) {
+                if (line) line.style.display = 'none';
+                if (hdr) hdr.textContent = s.hdr;
+                s.metrics.forEach((m, i) => { if (vals[i]) vals[i].textContent = m.range; });
+                return;
+            }
+            const rect = svg.getBoundingClientRect();
+            const fx = (event.clientX - rect.left) / rect.width;
+            if (fx < 0 || fx > 1) { weatherHover(); return; }
+            const dmin = s.days[0], dmax = s.days[s.days.length - 1], span = (dmax - dmin) || 1;
+            const target = dmin + fx * span;
+            let bi = 0, best = Infinity;
+            for (let i = 0; i < s.days.length; i++) { const d = Math.abs(s.days[i] - target); if (d < best) { best = d; bi = i; } }
+            if (line) {
+                line.style.left = ((s.days[bi] - dmin) / span * rect.width + rect.left - box.getBoundingClientRect().left) + 'px';
+                line.style.display = 'block';
+            }
+            if (hdr) hdr.textContent = fmt(s.days[bi]) + (s.bsize > 1 ? ' – ' + fmt(s.days[bi] + s.bsize - 1) : '');
+            s.metrics.forEach((m, i) => {
+                if (!vals[i]) return;
+                const v = m.v[bi];
+                vals[i].textContent = (v && v[1] != null) ? (num(v[1], m.dec) + ' ' + m.unit) : '—';
+            });
+        }
+
         function hideSelection() {
             selection.style.display = 'none';
             hideReport();
