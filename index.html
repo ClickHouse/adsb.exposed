@@ -2444,7 +2444,8 @@
             const line = document.getElementById('wline');
             const hdr = document.getElementById('whdr');
             const vals = box.querySelectorAll('.wval');
-            const svg = box.querySelector('.wspark');
+            const sparks = box.querySelectorAll('.wspark');
+            const svg = sparks[0];
             const num = (v, d) => (+v.toFixed(d)).toString();
             const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
             if (!event || !svg || !s.days.length) {
@@ -2461,7 +2462,12 @@
             let bi = 0, best = Infinity;
             for (let i = 0; i < s.days.length; i++) { const d = Math.abs(s.days[i] - target); if (d < best) { best = d; bi = i; } }
             if (line) {
-                line.style.left = ((s.days[bi] - dmin) / span * rect.width + rect.left - box.getBoundingClientRect().left) + 'px';
+                /// Span the cursor from the top of the first chart to the bottom of the last one.
+                const brect = box.getBoundingClientRect();
+                const first = sparks[0].getBoundingClientRect(), last = sparks[sparks.length - 1].getBoundingClientRect();
+                line.style.top = (first.top - brect.top) + 'px';
+                line.style.height = (last.bottom - first.top) + 'px';
+                line.style.left = ((s.days[bi] - dmin) / span * rect.width + rect.left - brect.left) + 'px';
                 line.style.display = 'block';
             }
             if (hdr) {

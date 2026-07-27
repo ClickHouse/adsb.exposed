@@ -3361,7 +3361,7 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`
                 }
                 const attr = JSON.stringify(series).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
                 return `<div id="wcharts" style="position:relative" data-series='${attr}' onmousemove="weatherHover(event)" onmouseleave="weatherHover()">`
-                    + `<div id="wline" style="position:absolute;top:20px;bottom:0;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
+                    + `<div id="wline" style="position:absolute;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
                     + `<div id="whdr" style="margin:2px 0 6px;opacity:.75">${hdr}</div>`
                     + body + `</div>`;
             }),
@@ -4068,7 +4068,7 @@ ORDER BY n`
                 }
                 const attr = JSON.stringify(series).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
                 return `<div id="wcharts" style="position:relative" data-series='${attr}' onmousemove="weatherHover(event)" onmouseleave="weatherHover()">`
-                    + `<div id="wline" style="position:absolute;top:20px;bottom:0;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
+                    + `<div id="wline" style="position:absolute;width:1px;background:currentColor;opacity:.4;display:none;pointer-events:none"></div>`
                     + `<div id="whdr" style="margin:2px 0 6px;opacity:.75">${hdr}</div>`
                     + body + `</div>`;
             }),
