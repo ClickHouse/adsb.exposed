@@ -220,7 +220,7 @@ Beyond ADS-B, the site now hosts a family of large open geospatial datasets, eac
 | **GBIF** (species occurrences) | 2.85 B | [GBIF on AWS](https://registry.opendata.aws/gbif/) Parquet (CC0 + CC-BY) | [gbif-setup.sql](gbif-setup.sql) · [prepare-gbif.sh](prepare-gbif.sh) |
 | **iNaturalist** (observations) | 257 M | [iNaturalist Open Data](https://registry.opendata.aws/inaturalist-open-data/) | [inat-setup.sql](inat-setup.sql) · [prepare-inat.sh](prepare-inat.sh) |
 | **Buildings** (Overture) | 2.55 B | [Overture Maps](https://docs.overturemaps.org/) Parquet (bbox centroids) | [overture-setup.sql](overture-setup.sql) · [prepare-overture.sh](prepare-overture.sh) |
-| **Weather** (NOAA ISD hourly) | 2.62 B | [NOAA Global Hourly](https://registry.opendata.aws/noaa-global-hourly/) (2000–2024) | [isd-setup.sql](isd-setup.sql) · [prepare-isd.sh](prepare-isd.sh) |
+| **Weather** (NOAA GHCNh hourly) | 7.71 B | [NCEI GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly), 1901→present, updated daily (replaced ISD, retired Aug 2025; ISD kept as the `isd_mercator` archive) | [ghcnh-setup.sql](ghcnh-setup.sql) · [prepare-ghcnh.sh](prepare-ghcnh.sh) |
 | **Taxi** (NYC trips) | ~1.3 B | ClickHouse public `trips_mergetree` (coordinate-bearing archive) | [taxi-setup.sql](taxi-setup.sql) · [prepare-taxi.sh](prepare-taxi.sh) |
 | **Fires** (NASA FIRMS) | ~40 M | [FIRMS](https://firms.modaps.eosdis.nasa.gov/) VIIRS country archive (2023–2024) | [firms-setup.sql](firms-setup.sql) · [prepare-firms.sh](prepare-firms.sh) |
 | **Lightning** (GOES GLM) | growing | [NOAA GOES-16](https://registry.opendata.aws/noaa-goes/) GLM NetCDF granules | [glm-setup.sql](glm-setup.sql) · [prepare-glm.sh](prepare-glm.sh) |
@@ -240,14 +240,12 @@ Example views (each opens the site on that dataset):
 
 - [OSM History — 20 years of mapping, replayed by edit time](https://adsb.exposed/?dataset=OSM%20History&zoom=4&lat=50.0000&lng=10.0000&query=bb1a1f3a932ab7957a7cd679c498d9f8)
 - [![GBIF](pictures/gbif_density.png) GBIF — where the world records biodiversity](https://adsb.exposed/?dataset=GBIF&zoom=4&lat=58.0000&lng=12.0000&query=ee97378f0f4c3b4d3c13f9096b81156d)
-- [![iNaturalist](pictures/inat_density.png) iNaturalist observations](https://adsb.exposed/?dataset=iNaturalist&zoom=3&lat=40.0000&lng=-40.0000&query=cb33ed6a6f5167f8161f4d2c9e5cb585)
 - [![Buildings](pictures/overture_density.png) Overture buildings — the US Northeast megalopolis](https://adsb.exposed/?dataset=Buildings&zoom=6&lat=40.0000&lng=-75.0000&query=459b55260d7eae8029d704174a51422c)
-- [![Weather](pictures/weather_temperature.png) NOAA ISD — mean temperature by station](https://adsb.exposed/?dataset=Weather&zoom=3&lat=30.0000&lng=10.0000&query=368e24b7da35f9a270991ee0c1a9fb2c)
-- [Taxi — NYC pickup density](https://adsb.exposed/?dataset=Taxi&zoom=11&lat=40.7500&lng=-73.9800&query=7837dca94200b540ff1bcdd03e0cba3b)
-- [![Fires](pictures/fires_density.png) FIRMS — sub-Saharan Africa ablaze](https://adsb.exposed/?dataset=Fires&zoom=3&lat=-10.0000&lng=25.0000&query=0d796379664ea9f911c760eef905675c)
-- [Lightning — GOES-16 GLM flashes](https://adsb.exposed/?dataset=Lightning&zoom=4&lat=30.0000&lng=-90.0000&query=11ef808a212b6eea3231b69e566a96a2)
+- [![Weather](pictures/weather_temperature.png) NOAA GHCNh — mean temperature over the station network (1901→present)](https://adsb.exposed/?dataset=Weather&zoom=3&lat=40.0000&lng=60.0000&query=208da01666d40ecc4dcc17b11271e418)
+- [![Taxi](pictures/taxi_density.png) Taxi — NYC pickup density](https://adsb.exposed/?dataset=Taxi&zoom=11&lat=40.7500&lng=-73.9800&query=7837dca94200b540ff1bcdd03e0cba3b)
+- [![Fires](pictures/fires_density.png) FIRMS — Africa and Australia ablaze](https://adsb.exposed/?dataset=Fires&zoom=3&lat=-10.0000&lng=25.0000&query=0d796379664ea9f911c760eef905675c)
+- [![Lightning](pictures/lightning_density.png) Lightning — GOES-16 GLM flashes](https://adsb.exposed/?dataset=Lightning&zoom=4&lat=30.0000&lng=-90.0000&query=11ef808a212b6eea3231b69e566a96a2)
 - [![Population](pictures/population_density.png) Kontur population — the Nile and the Ganges](https://adsb.exposed/?dataset=Population&zoom=4&lat=30.0000&lng=40.0000&query=d2b39ad671327b022caa0a2eba4003a5)
-- [Transit — live transit vehicles](https://adsb.exposed/?dataset=Transit&zoom=11&lat=42.3500&lng=-71.0700&query=0da2e471277084a4c6fbbe2b87edf605)
 - [Ships — MarineCadastre historical US-coastal AIS](https://adsb.exposed/?dataset=Ships&zoom=6&lat=40.0000&lng=-72.0000&query=41c8919cca38fa8626b9b0dec243da97)
 
 Access for the public read-only `website` user must be granted by an administrator after the tables exist — see [grants-new-datasets.sql](grants-new-datasets.sql) (the ingest user can create tables but cannot grant on them).
