@@ -43,9 +43,28 @@
         body {
             display: grid;
             grid-template-columns: auto 0%;
+            /* One track per element of the page, top to bottom: the ClickHouse banner, the
+               datasets row, the query, the examples row, the time slider, the stats line,
+               and the map, which takes whatever height is left. */
             grid-template-rows: fit-content(2em) fit-content(2em) fit-content(10%) fit-content(2em) fit-content(2.6em) 1em auto;
             grid-gap: 0;
         }
+
+        /* Every grid item names its track explicitly. Auto-placement would be enough only
+           while all of them are visible: it skips `display: none` items, so hiding the time
+           slider (a dataset without a time column, like Population or Buildings) used to
+           shift the stats line and the map up a track each, landing the map in the 1em stats
+           track — it rendered as a sliver and no amount of invalidateSize() could grow it,
+           because it was the grid, not Leaflet, that had the wrong size. An empty track is
+           sized to zero anyway, so the hidden slider leaves no gap behind. */
+        #proud { grid-row: 1; }
+        #datasets { grid-row: 2; }
+        #query { grid-row: 3; }
+        #examples { grid-row: 4; }
+        #timeslider { grid-row: 5; }
+        #stats { grid-row: 6; }
+        #map { grid-row: 7; }
+        #report { grid-row: 7; grid-column: 2; }
 
         /* The report panel lives in the second grid column, which stays collapsed to zero
            width while there is no report. The two states are switched with a class rather
@@ -839,9 +858,25 @@
                 });
             });
 
+            /// Some datasets only have data in a specific region (e.g. NYC taxi). If the
+            /// current view doesn't overlap that region, jump to it so the user sees data.
+            if (config.bounds && typeof map !== 'undefined' && map) {
+                const region = L.latLngBounds(config.bounds);
+                if (!map.getBounds().intersects(region)) {
+                    map.fitBounds(region);
+                }
+            }
+
             cached_tiles = {};
             last_tile_image = {};
             updateMap();
+
+            /// The controls above the map (examples, reports, time slider) change height
+            /// between datasets, which resizes the map's grid cell. Re-measure once the new
+            /// sizes are laid out, so Leaflet loads tiles for the whole cell.
+            if (typeof map !== 'undefined' && map) {
+                requestAnimationFrame(() => requestAnimationFrame(() => map.invalidateSize()));
+            }
         }
 
         /// The faint outlines under the density layer deserve the same treatment as the
@@ -1431,7 +1466,7 @@
         /// Special layer made of photos.
         async function getTopPhoto(coords) {
             /// This is fairly dirty.
-            let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+            let condition = /WHERE(.+?)GROUP BY/is.exec(query_elem.value)[1];
             const time_cond = getTimeCondition();
             if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 
@@ -1585,10 +1620,15 @@
         function updateTimeSlider() {
             /// Showing/hiding the slider changes the map's height, so Leaflet must re-measure,
             /// otherwise it keeps the stale size and leaves part of the map unloaded.
+            /// Deferred to the next frame, so that the grid has been laid out again by the
+            /// time Leaflet reads the new height. The slider keeps its own grid track while
+            /// hidden — see the `grid-row` declarations.
             const want = config.time ? 'block' : 'none';
             if (timeslider_elem.style.display !== want) {
                 timeslider_elem.style.display = want;
-                if (typeof map !== 'undefined' && map) map.invalidateSize();
+                if (typeof map !== 'undefined' && map) {
+                    requestAnimationFrame(() => requestAnimationFrame(() => map.invalidateSize()));
+                }
             }
             if (!config.time) return;
 
@@ -2119,7 +2159,7 @@
             const current_query = query_elem.value;
 
             /// This is fairly dirty.
-            let condition = /WHERE(.+)GROUP BY/is.exec(current_query)[1];
+            let condition = /WHERE(.+?)GROUP BY/is.exec(current_query)[1];
 
             /// Apply the time slider window to the report queries as well.
             const time_cond = getTimeCondition();
@@ -2364,7 +2404,11 @@
 
             calculateReport(config.report_total.query(condition), "total").then(json => {
                 if (!json || current_report_sequence_num != report_sequence_num) return;
-                document.getElementById('report_total').textContent = config.report_total.content(json);
+                const total = document.getElementById('report_total');
+                /// A report_total may render rich HTML (e.g. per-metric charts) via html();
+                /// otherwise it returns plain text via content().
+                if (config.report_total.html) total.innerHTML = config.report_total.html(json);
+                else total.textContent = config.report_total.content(json);
             });
 
             config.reports.forEach(report => {
@@ -2386,6 +2430,57 @@
             picture.firstChild.src = '';
             /// Selection cleared — restore the whole-dataset time chart.
             updateTimeSlider();
+        }
+
+        /// Hover interaction for the Weather area-report charts (config.report_total.html output).
+        /// Draws a shared vertical cursor across the charts, swaps each metric's right-hand value
+        /// from its total range to the hovered bucket's average, and shows the bucket's date range
+        /// in the header. Called from inline handlers on #wcharts; no-arg call resets.
+        function weatherHover(event) {
+            const box = document.getElementById('wcharts');
+            if (!box) return;
+            if (!box._s) { try { box._s = JSON.parse(box.dataset.series); } catch (e) { return; } }
+            const s = box._s;
+            const line = document.getElementById('wline');
+            const hdr = document.getElementById('whdr');
+            const vals = box.querySelectorAll('.wval');
+            const sparks = box.querySelectorAll('.wspark');
+            const svg = sparks[0];
+            const num = (v, d) => (+v.toFixed(d)).toString();
+            const fmt = d => new Date(d * 86400000).toISOString().slice(0, 10);
+            if (!event || !svg || !s.days.length) {
+                if (line) line.style.display = 'none';
+                if (hdr) hdr.textContent = s.hdr;
+                s.metrics.forEach((m, i) => { if (vals[i]) vals[i].textContent = m.range; });
+                return;
+            }
+            const rect = svg.getBoundingClientRect();
+            const fx = (event.clientX - rect.left) / rect.width;
+            if (fx < 0 || fx > 1) { weatherHover(); return; }
+            const dmin = s.days[0], dmax = s.days[s.days.length - 1], span = (dmax - dmin) || 1;
+            const target = dmin + fx * span;
+            let bi = 0, best = Infinity;
+            for (let i = 0; i < s.days.length; i++) { const d = Math.abs(s.days[i] - target); if (d < best) { best = d; bi = i; } }
+            if (line) {
+                /// Span the cursor from the top of the first chart to the bottom of the last one.
+                const brect = box.getBoundingClientRect();
+                const first = sparks[0].getBoundingClientRect(), last = sparks[sparks.length - 1].getBoundingClientRect();
+                line.style.top = (first.top - brect.top) + 'px';
+                line.style.height = (last.bottom - first.top) + 'px';
+                line.style.left = ((s.days[bi] - dmin) / span * rect.width + rect.left - brect.left) + 'px';
+                line.style.display = 'block';
+            }
+            if (hdr) {
+                /// Pin the header's natural (full-text) height so swapping to the shorter hovered
+                /// date can't shrink it and shift the charts below.
+                if (!hdr.dataset.pinned) { hdr.style.minHeight = hdr.offsetHeight + 'px'; hdr.dataset.pinned = '1'; }
+                hdr.textContent = fmt(s.days[bi]) + (s.bsize > 1 ? ' – ' + fmt(s.days[bi] + s.bsize - 1) : '');
+            }
+            s.metrics.forEach((m, i) => {
+                if (!vals[i]) return;
+                const v = m.v[bi];   // [p1, avg, p99]; show the 1–99% interval at the hovered bucket
+                vals[i].textContent = (v && v[0] != null) ? (num(v[0], m.dec) + '–' + num(v[2], m.dec) + ' ' + m.unit) : '—';
+            });
         }
 
         function hideSelection() {
@@ -2976,7 +3071,7 @@
 
                 /// Reuse the current query's WHERE (referencing in_tile), with in_tile
                 /// defined as the visible box — same shape as the report queries.
-                let condition = /WHERE(.+)GROUP BY/is.exec(query_elem.value)[1];
+                let condition = /WHERE(.+?)GROUP BY/is.exec(query_elem.value)[1];
                 const time_cond = getTimeCondition();
                 if (time_cond) condition = `(${condition}) AND ${time_cond}`;
 

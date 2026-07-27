@@ -209,6 +209,47 @@ The website also hosts other datasets besides ADS-B: places (Foursquare), bird o
 
 The OSM dataset contains every node of the planet (© OpenStreetMap contributors, [ODbL](LICENSE-ODbL.txt)), loaded from the weekly [ORC export on AWS Open Data](https://registry.opendata.aws/osm/). Untagged nodes are kept on purpose: they trace the geometry of ways, so a simple density visualization draws roads, buildings, and coastlines by itself. See [osm-setup.sql](osm-setup.sql) for the table structure and [prepare-osm.sh](prepare-osm.sh) for the loading pipeline — the data never touches the client: ClickHouse reads the ORC file directly from S3.
 
+### More datasets
+
+Beyond ADS-B, the site now hosts a family of large open geospatial datasets, each following the same recipe: a `*_mercator` table with materialized Web-Mercator coordinates and a Morton-ordered primary key, `_sample10`/`_sample100` companion tables for progressive tile loading, and a per-dataset entry in `config.js`. Each has a `*-setup.sql` (schema + grants) and a `prepare-*.sh` (loading pipeline) in this repo. Where possible the read is entirely server-side — ClickHouse pulls the source directly from S3, nothing is staged on a client.
+
+| Dataset | Rows | Source | Pipeline |
+|---|---|---|---|
+| **OSM** (current nodes) | 10.7 B | [osm-pds](https://registry.opendata.aws/osm/) planet ORC | [osm-setup.sql](osm-setup.sql) · [prepare-osm.sh](prepare-osm.sh) |
+| **OSM History** (all node versions) | 9.5 B | osm-pds full-history ORC | [osm-history-setup.sql](osm-history-setup.sql) · [prepare-osm-history.sh](prepare-osm-history.sh) |
+| **GBIF** (species occurrences) | 2.85 B | [GBIF on AWS](https://registry.opendata.aws/gbif/) Parquet (CC0 + CC-BY) | [gbif-setup.sql](gbif-setup.sql) · [prepare-gbif.sh](prepare-gbif.sh) |
+| **iNaturalist** (observations) | 257 M | [iNaturalist Open Data](https://registry.opendata.aws/inaturalist-open-data/) | [inat-setup.sql](inat-setup.sql) · [prepare-inat.sh](prepare-inat.sh) |
+| **Buildings** (Overture) | 2.55 B | [Overture Maps](https://docs.overturemaps.org/) Parquet (bbox centroids) | [overture-setup.sql](overture-setup.sql) · [prepare-overture.sh](prepare-overture.sh) |
+| **Weather** (NOAA GHCNh hourly) | 7.71 B | [NCEI GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly), 1901→present, updated daily (replaced ISD, retired Aug 2025; ISD kept as the `isd_mercator` archive) | [ghcnh-setup.sql](ghcnh-setup.sql) · [prepare-ghcnh.sh](prepare-ghcnh.sh) |
+| **Taxi** (NYC trips) | ~1.3 B | ClickHouse public `trips_mergetree` (coordinate-bearing archive) | [taxi-setup.sql](taxi-setup.sql) · [prepare-taxi.sh](prepare-taxi.sh) |
+| **Fires** (NASA FIRMS) | ~40 M | [FIRMS](https://firms.modaps.eosdis.nasa.gov/) VIIRS country archive (2023–2024) | [firms-setup.sql](firms-setup.sql) · [prepare-firms.sh](prepare-firms.sh) |
+| **Lightning** (GOES GLM) | growing | [NOAA GOES-16](https://registry.opendata.aws/noaa-goes/) GLM NetCDF granules | [glm-setup.sql](glm-setup.sql) · [prepare-glm.sh](prepare-glm.sh) |
+| **Population** (Kontur H3) | 33 M | [Kontur Population](https://data.humdata.org/dataset/kontur-population-dataset) GeoPackage | [population-setup.sql](population-setup.sql) · [prepare-population.sh](prepare-population.sh) |
+| **Transit** (GTFS-Realtime) | live | agency VehiclePositions feeds | [gtfs-setup.sql](gtfs-setup.sql) · [prepare-gtfs-rt.py](prepare-gtfs-rt.py) |
+
+The **Ships** dataset gained a `data_source` column (`aishub` for the live feed, `marinecadastre` for the historical NOAA/MarineCadastre US-coastal backfill), so the two can be told apart and filtered independently. The column was added to the live, continuously-written table with no writer downtime.
+
+A few notes on the trickier pipelines:
+
+- **Lightning** granules are NetCDF, which ClickHouse cannot read directly, so [glm_convert.py](glm_convert.py) decodes each granule on the ingest host and streams flashes in one INSERT per hour.
+- **Population** comes as a GeoPackage (a SQLite database of H3 hexagon polygons); [population_convert.py](population_convert.py) reads it with the standard library, takes each hexagon's envelope centre, and converts from Web Mercator to lat/lon.
+- **Transit** is a live feed like Planes and Ships. [prepare-gtfs-rt.py](prepare-gtfs-rt.py) is a prototype updater meant to run continuously on a separate host, polling GTFS-Realtime feeds and appending vehicle positions.
+- **Taxi** coordinates: the official NYC TLC files replaced lat/lon with taxi-zone IDs in 2016, so trips are loaded from the coordinate-bearing `trips_mergetree` archive kept in the ClickHouse public datasets bucket.
+
+Example views (each opens the site on that dataset):
+
+- [OSM History — 20 years of mapping, replayed by edit time](https://adsb.exposed/?dataset=OSM%20History&zoom=4&lat=50.0000&lng=10.0000&query=bb1a1f3a932ab7957a7cd679c498d9f8)
+- [![GBIF](pictures/gbif_density.png) GBIF — where the world records biodiversity](https://adsb.exposed/?dataset=GBIF&zoom=4&lat=58.0000&lng=12.0000&query=ee97378f0f4c3b4d3c13f9096b81156d)
+- [![Buildings](pictures/overture_density.png) Overture buildings — the US Northeast megalopolis](https://adsb.exposed/?dataset=Buildings&zoom=6&lat=40.0000&lng=-75.0000&query=459b55260d7eae8029d704174a51422c)
+- [![Weather](pictures/weather_temperature.png) NOAA GHCNh — mean temperature over the station network (1901→present)](https://adsb.exposed/?dataset=Weather&zoom=3&lat=40.0000&lng=60.0000&query=208da01666d40ecc4dcc17b11271e418)
+- [![Taxi](pictures/taxi_density.png) Taxi — NYC pickup density](https://adsb.exposed/?dataset=Taxi&zoom=11&lat=40.7500&lng=-73.9800&query=7837dca94200b540ff1bcdd03e0cba3b)
+- [![Fires](pictures/fires_density.png) FIRMS — Africa and Australia ablaze](https://adsb.exposed/?dataset=Fires&zoom=3&lat=-10.0000&lng=25.0000&query=0d796379664ea9f911c760eef905675c)
+- [![Lightning](pictures/lightning_density.png) Lightning — GOES-16 GLM flashes](https://adsb.exposed/?dataset=Lightning&zoom=4&lat=30.0000&lng=-90.0000&query=11ef808a212b6eea3231b69e566a96a2)
+- [![Population](pictures/population_density.png) Kontur population — the Nile and the Ganges](https://adsb.exposed/?dataset=Population&zoom=4&lat=30.0000&lng=40.0000&query=d2b39ad671327b022caa0a2eba4003a5)
+- [Ships — MarineCadastre historical US-coastal AIS](https://adsb.exposed/?dataset=Ships&zoom=6&lat=40.0000&lng=-72.0000&query=41c8919cca38fa8626b9b0dec243da97)
+
+Access for the public read-only `website` user must be granted by an administrator after the tables exist — see [grants-new-datasets.sql](grants-new-datasets.sql) (the ingest user can create tables but cannot grant on them).
+
 ## Implementation Details
 
 The website is implemented as a single HTML page. It does not use JavaScript frameworks and the source code is not minified, so you can easily [read it](https://github.com/ClickHouse/adsb.exposed/blob/main/index.html).
