@@ -2339,10 +2339,31 @@
                 return result;
             }
 
-            function createList(condition, report) {
-                calculateReport(report.query(condition), report.field).then(json => {
+            function enrichList(report, items) {
+                const keys = items.map(item => item.row[report.field]);
+                calculateReport(report.enrich.query(keys), `${report.field}_enrich`).then(json => {
                     if (!json || current_report_sequence_num != report_sequence_num) return;
 
+                    const labels = {};
+                    for (const row of json.data) labels[row.key] = row.value;
+
+                    for (const item of items) {
+                        const label = labels[item.row[report.field]];
+                        if (label) item.link.textContent = report.enrich.content(item.row, label);
+                    }
+                });
+            }
+
+            function createList(condition, report) {
+                if (report.enrich) ++report_queries_remaining;
+
+                calculateReport(report.query(condition), report.field).then(json => {
+                    if (!json || current_report_sequence_num != report_sequence_num) {
+                        if (report.enrich) reportQueryFinished();
+                        return;
+                    }
+
+                    const enrich_items = [];
                     let elem = document.getElementById(report.id);
                     clearContainer(elem);
                     elem.appendChild(document.createTextNode(report.title));
@@ -2396,9 +2417,15 @@
                             }
 
                             elem.appendChild(link);
+                            enrich_items.push({row, link});
                         }
                     }
                     if (json.data.length >= 100) elem.appendChild(document.createTextNode('…'));
+
+                    if (report.enrich) {
+                        if (enrich_items.length) enrichList(report, enrich_items);
+                        else reportQueryFinished();
+                    }
                 });
             }
 

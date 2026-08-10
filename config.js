@@ -1829,10 +1829,23 @@ GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
                     LIMIT 100`),
                 field: 'mmsi_str',
                 id: 'report_mmsi',
-                title: 'MMSIs: ',
-                separator: ', ',
+                title: 'Vessels:\n',
+                separator: ',\n',
                 filter_expr: (value => `mmsi = ${value.replaceAll("'", "")}`),
-                content: (row => `${row.mmsi_str} (${Number(row.c).toLocaleString()} pts, ${row.avg_sog} kn)`)
+                content: (row => `${row.mmsi_str} (${Number(row.c).toLocaleString()} pts, ${row.avg_sog} kn)`),
+                enrich: {
+                    query: (keys => {
+                        const mmsi = keys.map(key => Number(key)).filter(value =>
+                            Number.isInteger(value) && value >= 0 && value <= 0xFFFFFFFF);
+                        return `
+                            SELECT toString(mmsi) AS key, argMax(name, timestamp) AS value
+                            FROM ais_vessel_names
+                            WHERE mmsi IN (${mmsi.join(', ') || 'NULL'})
+                            GROUP BY mmsi`;
+                    }),
+                    content: ((row, name) =>
+                        `${name} — ${row.mmsi_str} (${Number(row.c).toLocaleString()} pts, ${row.avg_sog} kn)`),
+                },
             },
             {
                 query: (condition => `
