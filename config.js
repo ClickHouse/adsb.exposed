@@ -4549,4 +4549,9 @@ WHERE in_tile
 GROUP BY pos ORDER BY pos WITH FILL FROM 0 TO 1024*1024`,
         },
     },
+    /// A dataset can also be just an external link: it is shown in the datasets row
+    /// with an external link icon and opens the URL in a new tab instead of being selected.
+    "Vectors": {
+        external: "https://embeddings.info/",
+    },
 };

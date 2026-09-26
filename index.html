@@ -318,6 +318,29 @@
         /* GitHub star counter, floated to the right of the 3D toggle. It is an <a>, and its
            counter a <b>, not spans, so that neither the dataset-selection loops nor the
            `.choices span` box styling of the row treat them as dataset choices. */
+        /* A dataset that is an external link. Styled as the dataset buttons. */
+        .external-dataset {
+            display: inline-block;
+            padding: .25em .5em;
+            background: #444;
+            border: solid 0.125em black;
+            color: white;
+            text-decoration: none;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .external-dataset:hover {
+            color: black;
+            background: yellow;
+        }
+
+        .external-dataset svg {
+            width: .8em;
+            height: .8em;
+            fill: currentColor;
+        }
+
         #github-stars {
             float: right;
             margin: 0 0 .25em 0;
@@ -681,6 +704,19 @@
 
         datasets_elem.append('Datasets: ');
         Object.keys(datasets).forEach((dataset_name, idx) => {
+            /// External datasets are links to other websites. They are <a>, not spans,
+            /// so that the dataset-selection loops don't treat them as dataset choices.
+            if (datasets[dataset_name].external) {
+                let link = document.createElement('a');
+                link.className = 'external-dataset';
+                link.href = datasets[dataset_name].external;
+                link.target = '_blank';
+                link.rel = 'noopener noreferrer';
+                link.append(document.createTextNode(dataset_name + ' '));
+                link.insertAdjacentHTML('beforeend', `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M9 2h5v5h-1.5V4.56L7.53 9.53 6.47 8.47l4.97-4.97H9V2ZM3 4h4v1.5H4.5v6h6V9H12v4H3V4Z"/></svg>`);
+                datasets_elem.append(link);
+                return;
+            }
             let span = document.createElement('span');
             if (!idx) { span.className = 'selected'; }
             span.append(document.createTextNode(dataset_name));
@@ -700,6 +736,7 @@
         }
 
         function switchDataset(name) {
+            if (!datasets[name] || datasets[name].external) return;
             dataset = name;
             config = datasets[dataset];
             queries = config.queries;
