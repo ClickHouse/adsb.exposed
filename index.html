@@ -557,6 +557,24 @@
             margin: 0;
             padding: 0;
         }
+
+        #workers {
+            display: none;
+            position: absolute;
+            right: 0.5em;
+            top: 0.5em;
+            padding: .3em .5em;
+            font-family: monospace;
+            font-size: 12pt;
+            color: black;
+            background: lightgray;
+            box-shadow: 2px 2px 10px rgba(0,0,0,1);
+            z-index: 1001;
+        }
+
+        #workers input[type=number] {
+            width: 4em;
+        }
     </style>
 </head>
 
@@ -572,7 +590,12 @@
         <span id="timeslider-hover"></span>
     </div>
     <div id="stats"></div>
-    <div id="map"><div id="selection"></div><div id="cesium"></div></div>
+    <div id="map"><div id="selection"></div><div id="cesium"></div>
+        <div id="workers">
+            <select id="workers-mode"><option value="normal">Normal</option><option value="stateless">Stateless workers</option></select>
+            <label>Workers: <input id="workers-num" type="number" min="1" max="1000" value="10"/></label>
+        </div>
+    </div>
     <div id="report"></div>
     <div id="picture"><img/><span id="picture-copyright">Picture from Wikipedia, &copy; the details at the corresponding page.</span></div>
     <div id="error"><span id="error-close" title="Close">&times;</span><span id="error-text"></span></div>
@@ -637,6 +660,52 @@
         }
 
         document.getElementById('error-close').addEventListener('click', hideError);
+
+        /// Hidden "stateless workers" mode: the main queries are run with a distributed plan
+        /// over a number of stateless workers. Typing "iddqd" (outside of input fields) reveals
+        /// the selector. The choice is remembered in localStorage.
+        let stateless_workers = localStorage.getItem('stateless_workers') == '1';
+        let stateless_workers_num = +localStorage.getItem('stateless_workers_num') || 10;
+
+        function statelessWorkersParams() {
+            return stateless_workers
+                ? `&make_distributed_plan=1&distributed_plan_workers_num=${stateless_workers_num}`
+                : '';
+        }
+
+        {
+            const panel = document.getElementById('workers');
+            const mode_elem = document.getElementById('workers-mode');
+            const num_elem = document.getElementById('workers-num');
+            mode_elem.value = stateless_workers ? 'stateless' : 'normal';
+            num_elem.value = stateless_workers_num;
+            if (stateless_workers) panel.style.display = 'block';
+
+            /// The panel sits on top of the map; don't let it start drags or selections there.
+            L.DomEvent.disableClickPropagation(panel);
+            L.DomEvent.disableScrollPropagation(panel);
+            panel.addEventListener('pointerdown', e => e.stopPropagation());
+
+            mode_elem.addEventListener('change', () => {
+                stateless_workers = mode_elem.value == 'stateless';
+                localStorage.setItem('stateless_workers', stateless_workers ? '1' : '0');
+            });
+            num_elem.addEventListener('change', () => {
+                const n = Math.round(+num_elem.value);
+                if (!(n >= 1)) { num_elem.value = stateless_workers_num; return; }
+                stateless_workers_num = n;
+                num_elem.value = n;
+                localStorage.setItem('stateless_workers_num', n);
+            });
+
+            let typed = '';
+            document.addEventListener('keydown', e => {
+                if (e.target.closest && e.target.closest('input, textarea, select, [contenteditable]')) return;
+                if (e.key.length != 1) return;
+                typed = (typed + e.key.toLowerCase()).slice(-5);
+                if (typed == 'iddqd') panel.style.display = 'block';
+            });
+        }
 
         let datasets_elem = document.getElementById('datasets');
         let examples_elem = document.getElementById('examples');
@@ -1427,7 +1496,7 @@
             ++query_sequence_num;
             const query_id = `${uuid}-${query_sequence_num}-${level.table}-${tile.z}-${tile.x}-${tile.y}`;
             const hosts = getHosts(key);
-            const url = host => `${host}/?user=website&default_format=RowBinary` +
+            const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=RowBinary` +
                 (config.disable_cache ? '&use_query_cache=0' : '') +
                 `&query_id=${query_id}&replace_running_query=1` +
                 `&param_table=${level.table}&param_sampling=${level.sample}` +
@@ -1528,7 +1597,7 @@
             ++query_sequence_num;
             const query_id = `${uuid}-${query_sequence_num}-flickr_mercator_top-${coords.z + 2}-${coords.x}-${coords.y}`;
             const hosts = getHosts(`${coords.z}-${coords.x}-${coords.y}`);
-            const url = host => `${host}/?user=website&default_format=JSON` +
+            const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=JSON` +
                 `&query_id=${query_id}&replace_running_query=1` +
                 `&param_z=${coords.z + 2}&param_x=${coords.x}&param_y=${coords.y}`;
 
@@ -1728,7 +1797,7 @@
             /// The histogram covers the whole time range including today, so a long-lived cache
             /// entry would keep showing yesterday's picture for the most recent days. Cap the
             /// lifetime of these entries at one hour; the query is cheap enough to redo.
-            const url = host => `${host}/?user=website&default_format=JSON` +
+            const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=JSON` +
                 (config.disable_cache ? '&use_query_cache=0' : '&query_cache_ttl=3600') +
                 `&query_id=${query_id}&replace_running_query=1&param_table=${table}${geoParams}`;
 
@@ -2272,7 +2341,7 @@
             async function calculateReport(sql, field) {
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
-                const url = host => `${host}/?user=website&default_format=JSONEachRowWithProgress&query_id=${query_id}` +
+                const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=JSONEachRowWithProgress&query_id=${query_id}` +
                     `&param_table=${levels[levels.length - 1].table}` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
@@ -3151,7 +3220,7 @@
                 ++query_sequence_num;
                 const query_id = `${uuid}-${query_sequence_num}-flickr_photos`;
                 const hosts = getHosts('photos');
-                const url = host => `${host}/?user=website&default_format=JSON&query_id=${query_id}&replace_running_query=1` +
+                const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=JSON&query_id=${query_id}&replace_running_query=1` +
                     `&param_left=${Math.min(nw.x, se.x)}&param_right=${Math.max(nw.x, se.x)}` +
                     `&param_top=${Math.min(nw.y, se.y)}&param_bottom=${Math.max(nw.y, se.y)}`;
 
