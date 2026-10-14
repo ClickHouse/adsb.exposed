@@ -89,6 +89,8 @@ SETTINGS
     http_zlib_compression_level = 6,
     replace_running_query = 1,
     skip_unavailable_shards = 1,
+    enable_parallel_replicas = 1,
+    automatic_parallel_replicas_mode = 0, -- The default profile in ClickHouse Cloud sets it to 1, which overrides enable_parallel_replicas to 0.
     max_parallel_replicas = 100,
     use_query_cache = 1 CHANGEABLE_IN_READONLY,
     query_cache_ttl = 8640000,
