@@ -1,0 +1,410 @@
+{
+  "iceberg": {
+    "schemaV2": {
+      "type": "struct",
+      "schemaId": 0,
+      "fields": [
+        {
+          "id": 1,
+          "name": "mercator_x",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 2,
+          "name": "mercator_y",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 3,
+          "name": "mercator_morton",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 4,
+          "name": "time",
+          "type": "timestamp",
+          "required": true
+        },
+        {
+          "id": 5,
+          "name": "date",
+          "type": "date",
+          "required": true
+        },
+        {
+          "id": 6,
+          "name": "icao",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 7,
+          "name": "r",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 8,
+          "name": "t",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 9,
+          "name": "dbFlags",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 10,
+          "name": "noRegData",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 11,
+          "name": "ownOp",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 12,
+          "name": "year",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 13,
+          "name": "desc",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 14,
+          "name": "lat",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 15,
+          "name": "lon",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 16,
+          "name": "altitude",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 17,
+          "name": "ground_speed",
+          "type": "float",
+          "required": true
+        },
+        {
+          "id": 18,
+          "name": "track_degrees",
+          "type": "float",
+          "required": true
+        },
+        {
+          "id": 19,
+          "name": "flags",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 20,
+          "name": "vertical_rate",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 21,
+          "name": "aircraft_alert",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 22,
+          "name": "aircraft_alt_geom",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 23,
+          "name": "aircraft_gva",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 24,
+          "name": "aircraft_nac_p",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 25,
+          "name": "aircraft_nac_v",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 26,
+          "name": "aircraft_nic",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 27,
+          "name": "aircraft_nic_baro",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 28,
+          "name": "aircraft_rc",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 29,
+          "name": "aircraft_sda",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 30,
+          "name": "aircraft_sil",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 31,
+          "name": "aircraft_sil_type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 32,
+          "name": "aircraft_spi",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 33,
+          "name": "aircraft_track",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 34,
+          "name": "aircraft_type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 35,
+          "name": "aircraft_version",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 36,
+          "name": "aircraft_category",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 37,
+          "name": "aircraft_emergency",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 38,
+          "name": "aircraft_flight",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 39,
+          "name": "aircraft_squawk",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 40,
+          "name": "aircraft_baro_rate",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 41,
+          "name": "aircraft_nav_altitude_fms",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 42,
+          "name": "aircraft_nav_altitude_mcp",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 43,
+          "name": "aircraft_nav_modes",
+          "type": {
+            "element": "string",
+            "element-id": 64,
+            "element-required": true,
+            "type": "list"
+          },
+          "required": true
+        },
+        {
+          "id": 44,
+          "name": "aircraft_nav_qnh",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 45,
+          "name": "aircraft_geom_rate",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 46,
+          "name": "aircraft_ias",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 47,
+          "name": "aircraft_mach",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 48,
+          "name": "aircraft_mag_heading",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 49,
+          "name": "aircraft_oat",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 50,
+          "name": "aircraft_roll",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 51,
+          "name": "aircraft_tas",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 52,
+          "name": "aircraft_tat",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 53,
+          "name": "aircraft_true_heading",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 54,
+          "name": "aircraft_wd",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 55,
+          "name": "aircraft_ws",
+          "type": "long",
+          "required": true
+        },
+        {
+          "id": 56,
+          "name": "aircraft_track_rate",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 57,
+          "name": "aircraft_nav_heading",
+          "type": "double",
+          "required": true
+        },
+        {
+          "id": 58,
+          "name": "source",
+          "type": "string",
+          "required": true
+        },
+        {
+          "id": 59,
+          "name": "geometric_altitude",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 60,
+          "name": "geometric_vertical_rate",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 61,
+          "name": "indicated_airspeed",
+          "type": "int",
+          "required": true
+        },
+        {
+          "id": 62,
+          "name": "roll_angle",
+          "type": "float",
+          "required": true
+        },
+        {
+          "id": 63,
+          "name": "data_source",
+          "type": "string",
+          "required": true
+        }
+      ]
+    },
+    "writeOrder": {
+      "orderId": 1,
+      "fields": [
+        {
+          "sourceId": 3,
+          "transform": "identity",
+          "direction": "asc",
+          "nullOrder": "nulls-first"
+        },
+        {
+          "sourceId": 4,
+          "transform": "identity",
+          "direction": "asc",
+          "nullOrder": "nulls-first"
+        }
+      ]
+    }
+  }
+}
