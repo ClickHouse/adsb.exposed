@@ -94,6 +94,16 @@ Outside of ClickHouse Cloud, the role can be used with a trust policy for the id
 4. Look after the tables. The compaction runs in the background once a day (see the comments in `setup.sql` for its settings), but some of the maintenance is not automatic:
    - The compaction expires only the snapshots that referenced the files it merged. Expire the other snapshots and remove the files of the failed writes from time to time, with the `ALTER TABLE ... EXECUTE` commands at the end of `setup.sql`.
    - The compaction merges only the small files, so the files of the new data stay as they were merged: a few files a day, each covering a part of the map, sorted inside. A tile query skips most of them by min/max, but has to look at them, so the queries slow down over the months. Then rebuild the tables: create new tables in new directories of the bucket, and run the steps of `setup.sql` for them, with the new block numbers. The history is copied in the Morton order again, and the old tables can be dropped after the website switches to the new ones. `DROP TABLE` doesn't delete the files; delete the directory with `aws s3 rm --recursive s3://adsb-exposed-iceberg/<directory>/`.
+   - `DROP TABLE` doesn't delete the files of the table (unless `iceberg_delete_data_on_drop = 1`), and `CREATE TABLE` with the columns refuses to overwrite them: "Iceberg table with path ... already exists". To recreate the definition of a table and keep its data, e.g. to change its settings, drop the view and the table, create the table without the columns, which attaches the existing data (the columns and the sort order come from its metadata), then create the view again with the same block number: the cursor of the refreshes is stored in the Iceberg table, so the view continues where it stopped.
+
+     ```
+     CREATE TABLE planes_mercator_iceberg_sample100
+     ENGINE = IcebergS3('https://adsb-exposed-iceberg.s3.eu-west-1.amazonaws.com/planes_mercator_sample100/',
+         extra_credentials(role_arn = 'arn:aws:iam::111122223333:role/adsb-exposed-iceberg'))
+     SETTINGS allow_experimental_iceberg_compaction = 1, ... -- The same settings as in setup.sql.
+     ```
+
+     To start the table from scratch, delete its directory, `aws s3 rm --recursive s3://adsb-exposed-iceberg/planes_mercator_sample100/`, or use a new one, and run all the steps of `setup.sql` for this table, with a new block number of its source.
    - The number of data files shows how the compaction keeps up: `SELECT table, made_current_at, summary['total-data-files'] FROM system.iceberg_history WHERE table LIKE 'planes_mercator_iceberg%' ORDER BY made_current_at DESC`.
 
 5. The website can read the Iceberg tables `planes_mercator_iceberg`, `planes_mercator_iceberg_sample10`, and `planes_mercator_iceberg_sample100` by replacing the table names in the `levels` of the Planes dataset in `config.js`. If they are read through views, the views have to be `SQL SECURITY INVOKER`: a view with `SQL SECURITY DEFINER` disables skipping the Iceberg data files by min/max, and every tile query would read the whole table.

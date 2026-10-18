@@ -67,7 +67,7 @@ SET allow_insert_into_iceberg = 1; -- For CREATE TABLE and INSERT.
 --
 -- The location of every table is a directory in the bucket. ClickHouse creates the table there: it writes the first metadata file.
 -- In ClickHouse Cloud, the bucket is accessed with the IAM role of README.md: extra_credentials(role_arn = ...).
--- DROP TABLE does not delete the files.
+-- DROP TABLE does not delete the files; see README.md for recreating a table.
 
 CREATE TABLE planes_mercator_iceberg
 (
