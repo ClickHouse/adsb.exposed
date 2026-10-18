@@ -281,14 +281,11 @@ ORDER BY mortonEncode(mercator_x, mercator_y), time;
 -- It is read by the primary key, and the batches together write the whole table in the Morton order.
 -- Every INSERT is a single Iceberg commit; if one fails, only this batch has to be repeated.
 -- The batches are of uneven size: the tiles over Europe and North America contain most of the data.
--- Commits are optimistic, so pause the views for the time of the copy to avoid conflicts with them;
--- a paused view does not lose anything, it catches up from its cursor after start.
+-- The batches can run while the views keep refreshing, and in parallel with each other: the rows don't overlap
+-- (split by the block number), and a commit that conflicts with a concurrent one is retried (up to 100 times)
+-- on top of the latest snapshot, carrying the cursor of the latest refresh forward.
 
-SYSTEM STOP VIEW iceberg_planes_mercator;
-SYSTEM STOP VIEW iceberg_planes_mercator_sample10;
-SYSTEM STOP VIEW iceberg_planes_mercator_sample100;
-
--- Run for every {chunk} from 0 to 255, e.g. with clickhouse-client --param_chunk=...
+-- Run for every {chunk} from 0 to 255, e.g. with clickhouse-client --param_chunk=..., possibly a few at a time.
 -- The same for planes_mercator_sample10 with {N10} and planes_mercator_sample100 with {N100}.
 
 INSERT INTO planes_mercator_iceberg
@@ -306,10 +303,6 @@ SETTINGS
     allow_insert_into_iceberg = 1, -- Here as well, as the batches may run in separate sessions.
     iceberg_insert_max_rows_in_data_file = 100000000,
     iceberg_insert_max_bytes_in_data_file = '4Gi'; -- Uncompressed, gives the data files of a few hundred MB.
-
-SYSTEM START VIEW iceberg_planes_mercator;
-SYSTEM START VIEW iceberg_planes_mercator_sample10;
-SYSTEM START VIEW iceberg_planes_mercator_sample100;
 
 
 -- 5. Read access for the website.

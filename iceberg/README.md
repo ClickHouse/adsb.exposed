@@ -113,6 +113,8 @@ The whole `setup.sql` was run on a local ClickHouse 26.10 server, with `IcebergL
 | 8 | 3 | 577 | 26 |
 | 10 | 1 | 577 | 2 |
 
+The copy of the history doesn't need the views to be stopped. In another run, it ran in 4 parallel workers while the views refreshed every second and new rows kept arriving: 231 commits conflicted and were retried, 72 refreshes committed in between the batches, every snapshot after the first refresh kept the cursor, and the Iceberg tables again contained exactly the rows of the MergeTree tables.
+
 Partitioning by month made it worse: a tile at zoom 8 read 18 files, because every month had its own files for the same area.
 
 Not tested: the S3 bucket and the IAM role, and the background compaction, which exists only in ClickHouse Cloud. Its behavior described in `setup.sql` is from reading its code: it merges with `MergingSortedTransform` by the sort order of the table, selects the files by their compressed size and splits the result by the uncompressed one, and carries the cursor of the refreshes forward in its snapshots, also when it rebases on a concurrent refresh.
