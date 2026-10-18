@@ -573,9 +573,9 @@ const cloud_host = `https://${prefix}kvzqttvc2n.eu-west-1.aws.clickhouse-staging
 
 It maps a query to a pseudorandom hostname, e.g. `xyz.sticky.kvzqttvc2n.eu-west-1.aws.clickhouse-staging.com` so that the same query will be mapped to the same hostname. The load balancer maps this hostname to a replica using a consistent hashing algorithm.
 
-### Experimental: Iceberg on Amazon S3 Tables
+### Experimental: Iceberg in S3
 
-The [iceberg](https://github.com/ClickHouse/adsb.exposed/tree/main/iceberg) directory contains an experiment with storing the Planes dataset as Apache Iceberg tables in Amazon S3 Tables, written by ClickHouse. It is experimental, and it is not how the service works: the website reads the MergeTree tables described above.
+The [iceberg](https://github.com/ClickHouse/adsb.exposed/tree/main/iceberg) directory contains an experiment with storing the Planes dataset as Apache Iceberg tables in an S3 bucket, written and compacted by ClickHouse. It is experimental, and it is not how the service works: the website reads the MergeTree tables described above.
 
 
 ## References
