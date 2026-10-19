@@ -22,7 +22,10 @@ SET allow_insert_into_iceberg = 1; -- For CREATE TABLE and INSERT.
 -- - Iceberg has no 8 and 16-bit integers, no booleans written by ClickHouse, no enums and no dictionary-encoded types,
 --   so Bool, UInt16, Enum8 and LowCardinality(String) become Int32 and String.
 --   Parquet applies dictionary encoding to repeated strings by itself.
--- - UInt32 is stored as Iceberg long and is read back as Int64.
+-- - Iceberg has no unsigned types, so the UInt32 columns (mercator_x, mercator_y, flags) are declared as Int64 (Iceberg long).
+--   Don't declare them as UInt32: older versions, including ClickHouse Cloud 26.10.1.41066, store UInt32 as Iceberg int,
+--   which is signed, so the values from 2^31 are read back negative: the eastern and the southern hemispheres disappear
+--   from the map. Newer versions store UInt32 as long (ClickHouse#118596).
 -- - Iceberg timestamp has microsecond precision, so the time is DateTime64(6).
 -- - Iceberg has no MATERIALIZED columns, so the Web Mercator coordinates are stored as ordinary columns,
 --   calculated on insert.
@@ -71,8 +74,8 @@ SET allow_insert_into_iceberg = 1; -- For CREATE TABLE and INSERT.
 
 CREATE TABLE planes_mercator_iceberg
 (
-    mercator_x UInt32,
-    mercator_y UInt32,
+    mercator_x Int64,
+    mercator_y Int64,
     mercator_morton Int64,
 
     time DateTime64(6),
@@ -90,7 +93,7 @@ CREATE TABLE planes_mercator_iceberg
     altitude Int32,
     ground_speed Float32,
     track_degrees Float32,
-    flags UInt32,
+    flags Int64,
     vertical_rate Int32,
     aircraft_alert Int64,
     aircraft_alt_geom Int64,
@@ -152,9 +155,9 @@ SETTINGS
 
 CREATE TABLE planes_mercator_iceberg_sample10
 (
-    mercator_x UInt32, mercator_y UInt32, mercator_morton Int64,
+    mercator_x Int64, mercator_y Int64, mercator_morton Int64,
     time DateTime64(6), date Date, icao String, r String, t String, dbFlags Int32, noRegData Int32, ownOp String, year Int32, desc String,
-    lat Float64, lon Float64, altitude Int32, ground_speed Float32, track_degrees Float32, flags UInt32, vertical_rate Int32,
+    lat Float64, lon Float64, altitude Int32, ground_speed Float32, track_degrees Float32, flags Int64, vertical_rate Int32,
     aircraft_alert Int64, aircraft_alt_geom Int64, aircraft_gva Int64, aircraft_nac_p Int64, aircraft_nac_v Int64, aircraft_nic Int64,
     aircraft_nic_baro Int64, aircraft_rc Int64, aircraft_sda Int64, aircraft_sil Int64, aircraft_sil_type String, aircraft_spi Int64,
     aircraft_track Float64, aircraft_type String, aircraft_version Int64, aircraft_category String, aircraft_emergency String,
@@ -177,9 +180,9 @@ SETTINGS
 
 CREATE TABLE planes_mercator_iceberg_sample100
 (
-    mercator_x UInt32, mercator_y UInt32, mercator_morton Int64,
+    mercator_x Int64, mercator_y Int64, mercator_morton Int64,
     time DateTime64(6), date Date, icao String, r String, t String, dbFlags Int32, noRegData Int32, ownOp String, year Int32, desc String,
-    lat Float64, lon Float64, altitude Int32, ground_speed Float32, track_degrees Float32, flags UInt32, vertical_rate Int32,
+    lat Float64, lon Float64, altitude Int32, ground_speed Float32, track_degrees Float32, flags Int64, vertical_rate Int32,
     aircraft_alert Int64, aircraft_alt_geom Int64, aircraft_gva Int64, aircraft_nac_p Int64, aircraft_nac_v Int64, aircraft_nic Int64,
     aircraft_nic_baro Int64, aircraft_rc Int64, aircraft_sda Int64, aircraft_sil Int64, aircraft_sil_type String, aircraft_spi Int64,
     aircraft_track Float64, aircraft_type String, aircraft_version Int64, aircraft_category String, aircraft_emergency String,
