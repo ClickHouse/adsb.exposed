@@ -594,6 +594,7 @@
         <div id="workers">
             <select id="workers-mode"><option value="normal">Normal</option><option value="stateless">Stateless workers</option></select>
             <label>Workers: <input id="workers-num" type="number" min="1" max="1000" value="10"/></label>
+            <select id="storage-mode" title="Storage of the data"><option value="mergetree">MergeTree</option><option value="iceberg">Iceberg</option></select>
         </div>
     </div>
     <div id="report"></div>
@@ -667,6 +668,14 @@
         let stateless_workers = localStorage.getItem('stateless_workers') == '1';
         let stateless_workers_num = +localStorage.getItem('stateless_workers_num') || 10;
 
+        /// Hidden "Iceberg" mode, in the same panel: the queries read the copy of the data in Iceberg tables
+        /// (the `iceberg` table of a level in config.js, see the iceberg/ directory) instead of MergeTree.
+        let use_iceberg = localStorage.getItem('use_iceberg') == '1';
+
+        function levelTable(level) {
+            return (use_iceberg && level.iceberg) || level.table;
+        }
+
         function statelessWorkersParams() {
             return stateless_workers
                 ? `&make_distributed_plan=1&distributed_plan_workers_num=${stateless_workers_num}`
@@ -677,9 +686,11 @@
             const panel = document.getElementById('workers');
             const mode_elem = document.getElementById('workers-mode');
             const num_elem = document.getElementById('workers-num');
+            const storage_elem = document.getElementById('storage-mode');
             mode_elem.value = stateless_workers ? 'stateless' : 'normal';
             num_elem.value = stateless_workers_num;
-            if (stateless_workers) panel.style.display = 'block';
+            storage_elem.value = use_iceberg ? 'iceberg' : 'mergetree';
+            if (stateless_workers || use_iceberg) panel.style.display = 'block';
 
             /// The panel sits on top of the map; don't let it start drags or selections there.
             L.DomEvent.disableClickPropagation(panel);
@@ -689,6 +700,14 @@
             mode_elem.addEventListener('change', () => {
                 stateless_workers = mode_elem.value == 'stateless';
                 localStorage.setItem('stateless_workers', stateless_workers ? '1' : '0');
+            });
+            storage_elem.addEventListener('change', () => {
+                use_iceberg = storage_elem.value == 'iceberg';
+                localStorage.setItem('use_iceberg', use_iceberg ? '1' : '0');
+                /// The tiles and the histogram of the other storage must not be reused.
+                cached_tiles = {};
+                time_hist_cond = null;
+                updateMap();
             });
             num_elem.addEventListener('change', () => {
                 const n = Math.round(+num_elem.value);
@@ -810,6 +829,7 @@
             config = datasets[dataset];
             queries = config.queries;
             levels = config.levels;
+            document.getElementById('storage-mode').disabled = !levels.some(level => level.iceberg);
 
             resetTimeSlider();
 
@@ -1494,12 +1514,12 @@
             }
 
             ++query_sequence_num;
-            const query_id = `${uuid}-${query_sequence_num}-${level.table}-${tile.z}-${tile.x}-${tile.y}`;
+            const query_id = `${uuid}-${query_sequence_num}-${levelTable(level)}-${tile.z}-${tile.x}-${tile.y}`;
             const hosts = getHosts(key);
             const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=RowBinary` +
                 (config.disable_cache ? '&use_query_cache=0' : '') +
                 `&query_id=${query_id}&replace_running_query=1` +
-                `&param_table=${level.table}&param_sampling=${level.sample}` +
+                `&param_table=${levelTable(level)}&param_sampling=${level.sample}` +
                 `&param_z=${tile.z}&param_x=${tile.x}&param_y=${tile.y}`;
 
             progress_update_period = 1;
@@ -1777,7 +1797,7 @@
             /// from the same sampled table, so the ratio between them is unbiased. Without a
             /// selection we just return the daily totals.
             const bounds = getSelectionBounds();
-            const table = config.levels[0].table;
+            const table = levelTable(config.levels[0]);
             const geoParams = bounds
                 ? `&param_left=${bounds.left}&param_right=${bounds.right}&param_top=${bounds.top}&param_bottom=${bounds.bottom}`
                 : '';
@@ -2342,7 +2362,7 @@
                 const query_id = `${uuid}-${field}-${current_report_sequence_num}`;
                 const hosts = getHosts([field, selected_box, sql]);
                 const url = host => `${host}/?user=website${statelessWorkersParams()}&default_format=JSONEachRowWithProgress&query_id=${query_id}` +
-                    `&param_table=${levels[levels.length - 1].table}` +
+                    `&param_table=${levelTable(levels[levels.length - 1])}` +
                     `&param_left=${Math.min(selected_box[0].x, selected_box[1].x)}` +
                     `&param_right=${Math.max(selected_box[0].x, selected_box[1].x)}` +
                     `&param_top=${Math.min(selected_box[0].y, selected_box[1].y)}` +

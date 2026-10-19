@@ -306,7 +306,7 @@ SETTINGS
 
 
 -- 5. Read access for the website.
--- The website can use the tables by replacing the table names in the "levels" of the "Planes" dataset in config.js.
+-- The website reads them in a hidden mode: type "iddqd" on the page and choose "Iceberg" (the "iceberg" fields of the "levels" in config.js).
 -- Note: if they are read through views, the views must be SQL SECURITY INVOKER (or NONE): a view with SQL SECURITY DEFINER
 -- disables the pruning of Iceberg data files by min/max (checked in 26.10: a tile query reads every file).
 

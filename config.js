@@ -21,10 +21,11 @@ const datasets = {
                 ]
             },
         ],
+        /// `iceberg`: the same data in Iceberg tables (see iceberg/), used in the hidden Iceberg mode.
         levels: [
-            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'planes_mercator',           sample: 1,   priority: 3 },
+            { table: 'planes_mercator_sample100', iceberg: 'planes_mercator_iceberg_sample100', sample: 100, priority: 1 },
+            { table: 'planes_mercator_sample10',  iceberg: 'planes_mercator_iceberg_sample10',  sample: 10,  priority: 2 },
+            { table: 'planes_mercator',           iceberg: 'planes_mercator_iceberg',           sample: 1,   priority: 3 },
         ],
         time: { column: 'time' },
         report_total: {
