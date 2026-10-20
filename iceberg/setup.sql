@@ -282,7 +282,8 @@ ORDER BY mortonEncode(mercator_x, mercator_y), time;
 -- 4. The history: copy the rows up to the remembered block numbers, in 256 batches by the Morton code.
 -- A batch is a contiguous range of the Morton curve, which is a tile of zoom level 4: {chunk} goes from 0 to 255.
 -- It is read by the primary key, and the batches together write the whole table in the Morton order.
--- Every INSERT is a single Iceberg commit; if one fails, only this batch has to be repeated.
+-- Every INSERT is a single Iceberg commit (with max_insert_threads = 1); if one fails, nothing of it is committed,
+-- and only this batch has to be repeated. The files it uploaded before the failure stay as orphan files, see section 6.
 -- The batches are of uneven size: the tiles over Europe and North America contain most of the data.
 -- The batches can run while the views keep refreshing, and in parallel with each other: the rows don't overlap
 -- (split by the block number), and a commit that conflicts with a concurrent one is retried (up to 100 times)
@@ -304,6 +305,9 @@ WHERE _block_number <= {N}
 ORDER BY mortonEncode(mercator_x, mercator_y), time -- The sorting key of the source: it is read in order, without sorting.
 SETTINGS
     allow_insert_into_iceberg = 1, -- Here as well, as the batches may run in separate sessions.
+    max_insert_threads = 1, -- A single writer: one commit, so the batch is atomic, and files of consecutive Morton ranges.
+                            -- With several threads (4 by default in ClickHouse Cloud), every thread commits separately,
+                            -- so a failure can leave a part of the batch, and every file spans the whole batch.
     iceberg_insert_max_rows_in_data_file = 100000000,
     iceberg_insert_max_bytes_in_data_file = '4Gi'; -- Uncompressed, gives the data files of a few hundred MB.
 
