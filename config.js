@@ -21,11 +21,16 @@ const datasets = {
                 ]
             },
         ],
+        /// `iceberg`: the same data in Iceberg tables (see iceberg/), used in the hidden Iceberg mode.
         levels: [
-            { table: 'planes_mercator_sample100', sample: 100, priority: 1 },
-            { table: 'planes_mercator_sample10',  sample: 10,  priority: 2 },
-            { table: 'planes_mercator',           sample: 1,   priority: 3 },
+            { table: 'planes_mercator_sample100', iceberg: 'planes_mercator_iceberg_sample100', sample: 100, priority: 1 },
+            { table: 'planes_mercator_sample10',  iceberg: 'planes_mercator_iceberg_sample10',  sample: 10,  priority: 2 },
+            { table: 'planes_mercator',           iceberg: 'planes_mercator_iceberg',           sample: 1,   priority: 3 },
         ],
+        /// Applied to the queries in the Iceberg mode. The Iceberg tables were created by a ClickHouse version that stored UInt32
+        /// as the signed Iceberg int (fixed in ClickHouse#118596), so mercator_x and mercator_y from 2^31 (the eastern and
+        /// the southern hemispheres) are read back negative; casting them back keeps the pruning by min/max working.
+        iceberg_query: (sql => sql.replace(/\bmercator_(x|y)\b/g, 'toUInt32(mercator_$1)')),
         time: { column: 'time' },
         report_total: {
             query: (condition => `
