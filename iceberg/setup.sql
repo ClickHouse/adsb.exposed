@@ -59,9 +59,17 @@ SET allow_insert_into_iceberg = 1; -- For CREATE TABLE and INSERT.
 -- into files of iceberg_compaction_max_bytes_in_data_file each - but measured on uncompressed data.
 -- The defaults (384 MiB and 512 MiB) don't fit together: the result files are smaller than 384 MiB after compression,
 -- so they are selected again by every next compaction, and so are the files of the history smaller than 384 MiB.
--- Here, the threshold is 128 MiB, and the result files are up to 4 GiB uncompressed, a few hundred MB compressed.
+-- How large the result files are after compression depends on the data: 4 GiB uncompressed gave ~450 MiB compressed
+-- for planes_mercator_sample100, but only ~108 MiB for planes_mercator (compression ratio ~38), below the threshold,
+-- so that table was rewritten endlessly (ClickHouse/clickhouse-private#83527).
+-- Until the output is cut by the compressed size, the limit is set to 1 TiB: every merge writes a single file.
+-- A merge then reads up to iceberg_max_number_datafiles_to_compact files at once. With the default (1000), a merge of planes_mercator
+-- took 90 GiB of memory in the first minute, before reading a row; with 100, it peaks at ~31 GiB when it starts.
+-- The lower threshold is 10 GiB: files are merged again, up to 16 at a time, until they are 10 GiB compressed, which rewrites
+-- every row a few times, like the levels of MergeTree merges. The upper threshold must be above it (#76227).
+-- (With a threshold of 128 MiB, the files written by INSERTs, ~110 MiB, were merged once and stayed small.)
 -- The compaction runs once a day (iceberg_compaction_delay_bias): the files of a day (96 refreshes, a few GB for planes_mercator)
--- are merged into a few files, each covering a contiguous range of the Morton curve, so the tile queries skip most of them.
+-- are merged into a single file, sorted by the Morton curve, so the row groups and pages of it are skipped by tile queries.
 -- A day's batch for the sample tables is smaller than the threshold and is merged again with the next days, until it is large enough.
 -- The compaction never merges the files that are already large enough, so the number of the files of the new data grows
 -- by a few files a day; to restore the layout of the history, the tables can be rebuilt (see README.md).
@@ -147,8 +155,11 @@ SETTINGS
     allow_experimental_iceberg_compaction = 1,
     allow_experimental_cleanup_old_data_files_compaction = 1,
     iceberg_compaction_delay_bias = 86400,
-    iceberg_data_file_size_lower_threshold_compaction = '128Mi',
-    iceberg_compaction_max_bytes_in_data_file = '4Gi';
+    iceberg_data_file_size_lower_threshold_compaction = '10Gi', -- Files are merged until they reach 10 GiB (compressed).
+    iceberg_data_file_size_upper_threshold_compaction = '1Ti', -- Must be above the lower threshold (#76227).
+    iceberg_compaction_max_bytes_in_data_file = '1Ti', -- A single result file per merge, see above.
+    iceberg_max_number_datafiles_to_compact = 16, -- A merge opens all its inputs at once: ~31 GiB of memory for 100 files.
+    iceberg_compaction_commit_batch_size = 5; -- Publish merges soon; unpublished merges are lost on restart (#83542).
 
 -- The level-of-detail tables have the same structure.
 -- Note: CREATE TABLE ... AS cannot be used here, as it would copy the location of the table.
@@ -175,8 +186,11 @@ SETTINGS
     allow_experimental_iceberg_compaction = 1,
     allow_experimental_cleanup_old_data_files_compaction = 1,
     iceberg_compaction_delay_bias = 86400,
-    iceberg_data_file_size_lower_threshold_compaction = '128Mi',
-    iceberg_compaction_max_bytes_in_data_file = '4Gi';
+    iceberg_data_file_size_lower_threshold_compaction = '10Gi', -- Files are merged until they reach 10 GiB (compressed).
+    iceberg_data_file_size_upper_threshold_compaction = '1Ti', -- Must be above the lower threshold (#76227).
+    iceberg_compaction_max_bytes_in_data_file = '1Ti', -- A single result file per merge, see above.
+    iceberg_max_number_datafiles_to_compact = 16, -- A merge opens all its inputs at once: ~31 GiB of memory for 100 files.
+    iceberg_compaction_commit_batch_size = 5; -- Publish merges soon; unpublished merges are lost on restart (#83542).
 
 CREATE TABLE planes_mercator_iceberg_sample100
 (
@@ -200,8 +214,11 @@ SETTINGS
     allow_experimental_iceberg_compaction = 1,
     allow_experimental_cleanup_old_data_files_compaction = 1,
     iceberg_compaction_delay_bias = 86400,
-    iceberg_data_file_size_lower_threshold_compaction = '128Mi',
-    iceberg_compaction_max_bytes_in_data_file = '4Gi';
+    iceberg_data_file_size_lower_threshold_compaction = '10Gi', -- Files are merged until they reach 10 GiB (compressed).
+    iceberg_data_file_size_upper_threshold_compaction = '1Ti', -- Must be above the lower threshold (#76227).
+    iceberg_compaction_max_bytes_in_data_file = '1Ti', -- A single result file per merge, see above.
+    iceberg_max_number_datafiles_to_compact = 16, -- A merge opens all its inputs at once: ~31 GiB of memory for 100 files.
+    iceberg_compaction_commit_batch_size = 5; -- Publish merges soon; unpublished merges are lost on restart (#83542).
 
 
 -- 2. The source tables must persist the block number and the offset of every row:
@@ -282,7 +299,8 @@ ORDER BY mortonEncode(mercator_x, mercator_y), time;
 -- 4. The history: copy the rows up to the remembered block numbers, in 256 batches by the Morton code.
 -- A batch is a contiguous range of the Morton curve, which is a tile of zoom level 4: {chunk} goes from 0 to 255.
 -- It is read by the primary key, and the batches together write the whole table in the Morton order.
--- Every INSERT is a single Iceberg commit; if one fails, only this batch has to be repeated.
+-- Every INSERT is a single Iceberg commit (with max_insert_threads = 1); if one fails, nothing of it is committed,
+-- and only this batch has to be repeated. The files it uploaded before the failure stay as orphan files, see section 6.
 -- The batches are of uneven size: the tiles over Europe and North America contain most of the data.
 -- The batches can run while the views keep refreshing, and in parallel with each other: the rows don't overlap
 -- (split by the block number), and a commit that conflicts with a concurrent one is retried (up to 100 times)
@@ -304,6 +322,9 @@ WHERE _block_number <= {N}
 ORDER BY mortonEncode(mercator_x, mercator_y), time -- The sorting key of the source: it is read in order, without sorting.
 SETTINGS
     allow_insert_into_iceberg = 1, -- Here as well, as the batches may run in separate sessions.
+    max_insert_threads = 1, -- A single writer: one commit, so the batch is atomic, and files of consecutive Morton ranges.
+                            -- With several threads (4 by default in ClickHouse Cloud), every thread commits separately,
+                            -- so a failure can leave a part of the batch, and every file spans the whole batch.
     iceberg_insert_max_rows_in_data_file = 100000000,
     iceberg_insert_max_bytes_in_data_file = '4Gi'; -- Uncompressed, gives the data files of a few hundred MB.
 
